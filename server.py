@@ -2,6 +2,8 @@ import logging
 
 from fastmcp import FastMCP
 
+from config import ENV_CONFIG
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
