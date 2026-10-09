@@ -16,11 +16,20 @@ def _flag(value: bool) -> str:
     return '1' if value else '0'
 
 
-async def ping(env_config: dict[str, str]) -> str:
+async def _get(
+    env_config: dict[str, str], path: str, params: dict[str, str] | None = None
+) -> httpx.Response:
     async with httpx.AsyncClient() as client:
-        response = await client.get(_api_url(env_config, 'ping'), headers=_headers(env_config))
+        response = await client.get(
+            _api_url(env_config, path), headers=_headers(env_config), params=params
+        )
         response.raise_for_status()
-        return response.text
+        return response
+
+
+async def ping(env_config: dict[str, str]) -> str:
+    response = await _get(env_config, 'ping')
+    return response.text
 
 
 async def list_tickets(
@@ -49,9 +58,10 @@ async def list_tickets(
     if filters:
         params['filters'] = json.dumps(filters)
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            _api_url(env_config, 'tickets'), headers=_headers(env_config), params=params
-        )
-        response.raise_for_status()
-        return response.json()
+    response = await _get(env_config, 'tickets', params)
+    return response.json()
+
+
+async def get_ticket_details(env_config: dict[str, str], ticket_number: int) -> dict[str, Any]:
+    response = await _get(env_config, 'tickets/details', {'ticket_number': str(ticket_number)})
+    return response.json()

@@ -98,6 +98,47 @@ async def list_tickets(
     )
 
 
+@mcp.tool
+async def get_ticket_details(ticket_number: int) -> dict[str, Any]:
+    """Get the full details of one Desk365 ticket by its ticket number.
+
+    Use this when you need everything about a specific ticket, such as its
+    description, which list_tickets leaves out by default. Ticket numbers come from
+    list_tickets results or from the user (e.g. "ticket #1234" means 1234).
+
+    Returns the ticket as an object with ticket_number, subject, description (HTML),
+    description_text (plain text), status, priority, type, source, form_name,
+    contact_email, contact_name, assigned_to, group, category, subcategory,
+    company_name, department_name, sla, created_on, updated_on, updated_by,
+    resolved_on, closed_on, closed_by, due_date, duration fields, custom_fields,
+    attachments, watchers, share_to, conversation_count and associated_assets.
+    Fields that don't apply yet (e.g. closed_on on an open ticket) are null.
+    Timestamps use the format "yyyy-mm-dd hh:mm:ss".
+
+    description_text strips all line breaks, so separate lines can run together
+    (e.g. "Name: Jane DoePhone: 555-0100"). Read the HTML description when
+    the ticket's layout matters. custom_fields is always included and maps
+    "cf_<field name>" to a value, or null when the field is empty.
+
+    The replies and notes in the ticket's conversation are not included;
+    conversation_count only says how many there are.
+
+    Coded values:
+    - priority: Low=1, Medium=5, High=10, Urgent=20
+    - source: Email=1, Microsoft Teams=5, Support Portal=6, Phone or Other=7,
+      Web Form=12, Web Widget=13, API=15, Chat Widget (AI Agent)=16,
+      Microsoft Teams (AI Agent)=17, Support Portal (AI Agent)=18
+    - updated_by_type, closed_by_type: System=1, Agent=2, Contact=3
+    - first_replied_duration, first_assigned_duration, resolved_duration and
+      closed_duration are in minutes.
+
+    Args:
+        ticket_number: The ticket's number, as shown in Desk365 (e.g. 1234).
+    """
+    logger.info('Getting Desk365 ticket details (ticket_number=%s)', ticket_number)
+    return await api.get_ticket_details(env_config, ticket_number)
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

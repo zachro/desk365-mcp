@@ -112,6 +112,32 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("list_tickets")
 
+    async def test_get_ticket_details_requests_ticket_by_number(self):
+        ticket = {"ticket_number": 1234, "subject": "Printer not working", "priority": 10}
+        self.mock_api(httpx.Response(200, json=ticket))
+
+        result = await self.call_tool("get_ticket_details", {"ticket_number": 1234})
+
+        self.assertEqual(result.structured_content, ticket)
+        request = self.requests[0]
+        self.assertEqual(request.url.path, "/apis/v3/tickets/details")
+        self.assertEqual(dict(request.url.params), {"ticket_number": "1234"})
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+
+    async def test_get_ticket_details_requires_ticket_number(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("get_ticket_details")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_get_ticket_details_raises_when_ticket_not_found(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("get_ticket_details", {"ticket_number": 99999})
+
 
 if __name__ == "__main__":
     unittest.main()
