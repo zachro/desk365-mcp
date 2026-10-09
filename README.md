@@ -15,6 +15,7 @@ It works with any Desk365 account. Everything specific to your account goes in a
 | `get_ticket_details` | Gets the full details of one ticket by ticket number, including its description and custom fields. |
 | `get_ticket_conversations` | Gets a ticket's conversation history: contact and agent replies, public and private notes, and forwarded messages. Each type can be left out, and messages can be sorted oldest or newest first. |
 | `create_ticket` | Creates a ticket for a contact's email address. It can set the description, status, priority, type, assignee, group, category, subcategory, form, custom fields, watchers and shared contacts. |
+| `add_ticket_reply` | Sends a reply on a ticket, which is emailed to the contact. It supports CC/BCC, choosing the sending agent and from-address, notifying earlier CCs, and quoting earlier messages. |
 
 Each tool's docstring in `desk365_mcp/server.py` explains to the LLM when and how to use it.
 

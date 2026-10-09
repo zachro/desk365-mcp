@@ -417,6 +417,56 @@ async def create_ticket(
     )
 
 
+@mcp.tool
+async def add_ticket_reply(
+    ticket_number: int,
+    body: str,
+    cc_emails: list[str] | None = None,
+    bcc_emails: list[str] | None = None,
+    agent_email: str | None = None,
+    from_email: str | None = None,
+    include_prev_ccs: bool = False,
+    include_prev_messages: bool = False,
+) -> dict[str, Any]:
+    """Send a reply on a Desk365 ticket. The reply is emailed to the ticket's contact.
+
+    A sent reply can't be unsent, so only call this when the user has asked to reply,
+    and show them the exact text and recipients and get their approval first, unless
+    they already approved this exact reply. Never include private notes or other
+    internal information in a reply. Each call sends another email, so don't retry
+    after a success. To record something only agents should see, use
+    add_ticket_note instead.
+
+    Returns the created reply: {"id", "ticket_number", "body", "from_email",
+    "to_email", "cc_emails", "bcc_emails", "attachments"}.
+
+    Args:
+        ticket_number: The ticket's number, as shown in Desk365 (e.g. 1234).
+        body: The reply text. It can use HTML formatting such as <p>, <br> and <b>.
+        cc_emails: Email addresses to CC on the reply.
+        bcc_emails: Email addresses to BCC on the reply.
+        agent_email: Email address of the agent the reply is from. Leave unset unless
+            the user says which agent should send it.
+        from_email: Support email address to send from. Defaults to the account's
+            main support address.
+        include_prev_ccs: Also send to the addresses CC'd earlier on the ticket.
+        include_prev_messages: Quote the earlier messages of the conversation below
+            the reply.
+    """
+    logger.info('Adding reply to Desk365 ticket (ticket_number=%s)', ticket_number)
+    return await api.add_ticket_reply(
+        env_config,
+        ticket_number,
+        body,
+        cc_emails=cc_emails,
+        bcc_emails=bcc_emails,
+        agent_email=agent_email,
+        from_email=from_email,
+        include_prev_ccs=include_prev_ccs,
+        include_prev_messages=include_prev_messages,
+    )
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

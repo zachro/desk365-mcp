@@ -40,10 +40,15 @@ async def _get(
         return response
 
 
-async def _post(env_config: dict[str, str], path: str, body: dict[str, Any]) -> httpx.Response:
+async def _post(
+    env_config: dict[str, str],
+    path: str,
+    body: dict[str, Any],
+    params: dict[str, str] | None = None,
+) -> httpx.Response:
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            _api_url(env_config, path), headers=_headers(env_config), json=body
+            _api_url(env_config, path), headers=_headers(env_config), json=body, params=params
         )
         response.raise_for_status()
         return response
@@ -255,3 +260,32 @@ async def advanced_search_tickets(
         order_by=order_by,
         include_merged=include_merged,
     )
+
+
+async def add_ticket_reply(
+    env_config: dict[str, str],
+    ticket_number: int,
+    body: str,
+    cc_emails: list[str] | None = None,
+    bcc_emails: list[str] | None = None,
+    agent_email: str | None = None,
+    from_email: str | None = None,
+    include_prev_ccs: bool = False,
+    include_prev_messages: bool = False,
+) -> dict[str, Any]:
+    if not body.strip():
+        raise ValueError('body must not be empty.')
+    payload = {
+        'body': body,
+        'cc_emails': ','.join(cc_emails) if cc_emails else None,
+        'bcc_emails': ','.join(bcc_emails) if bcc_emails else None,
+        'agent_email': agent_email,
+        'from_email': from_email,
+        'include_prev_ccs': int(include_prev_ccs),
+        'include_prev_messages': int(include_prev_messages),
+    }
+    payload = {key: value for key, value in payload.items() if value is not None}
+    response = await _post(
+        env_config, 'tickets/add_reply', payload, {'ticket_number': str(ticket_number)}
+    )
+    return response.json()

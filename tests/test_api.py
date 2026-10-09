@@ -70,6 +70,16 @@ class RequestTests(ApiTestCase):
         self.assertEqual(self.request.headers["Content-Type"], "application/json")
         self.assertEqual(json.loads(self.request.content), {"subject": "Help"})
 
+    async def test_post_sends_query_params(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        await api._post(ENV_CONFIG, "tickets/add_note", {"body": "Hi"}, {"ticket_number": "10"})
+
+        self.assertEqual(
+            str(self.request.url),
+            "https://acme.desk365.io/apis/v3/tickets/add_note?ticket_number=10",
+        )
+
     async def test_get_raises_on_http_error(self):
         self.mock_api(httpx.Response(401, json={"status": 401, "error": "Unauthorized"}))
 
@@ -546,6 +556,80 @@ class CreateTicketTests(ApiTestCase):
 
         with self.assertRaises(httpx.HTTPStatusError):
             await api.create_ticket(ENV_CONFIG, email="customer@example.com", subject="Help")
+
+
+class AddTicketReplyTests(ApiTestCase):
+    async def test_returns_created_reply(self):
+        reply = {"id": 1, "ticket_number": 1234, "body": "On it.", "to_email": "c@example.com"}
+        self.mock_api(httpx.Response(200, json=reply))
+
+        result = await api.add_ticket_reply(ENV_CONFIG, 1234, "On it.")
+
+        self.assertEqual(result, reply)
+        self.assertEqual(self.request.method, "POST")
+        self.assertEqual(self.request.url.path, "/apis/v3/tickets/add_reply")
+        self.assertEqual(dict(self.request.url.params), {"ticket_number": "1234"})
+
+    async def test_sends_body_and_default_flags(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+
+        await api.add_ticket_reply(ENV_CONFIG, 1234, "<p>On it.</p>")
+
+        self.assertEqual(
+            json.loads(self.request.content),
+            {"body": "<p>On it.</p>", "include_prev_ccs": 0, "include_prev_messages": 0},
+        )
+
+    async def test_maps_arguments_to_api_fields(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+
+        await api.add_ticket_reply(
+            ENV_CONFIG,
+            1234,
+            "On it.",
+            cc_emails=["a@example.com", "b@example.com"],
+            bcc_emails=["c@example.com"],
+            agent_email="agent@example.com",
+            from_email="support@example.com",
+            include_prev_ccs=True,
+            include_prev_messages=True,
+        )
+
+        self.assertEqual(
+            json.loads(self.request.content),
+            {
+                "body": "On it.",
+                "cc_emails": "a@example.com,b@example.com",
+                "bcc_emails": "c@example.com",
+                "agent_email": "agent@example.com",
+                "from_email": "support@example.com",
+                "include_prev_ccs": 1,
+                "include_prev_messages": 1,
+            },
+        )
+
+    async def test_omits_empty_email_lists(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+
+        await api.add_ticket_reply(ENV_CONFIG, 1234, "On it.", cc_emails=[], bcc_emails=[])
+
+        body = json.loads(self.request.content)
+        self.assertNotIn("cc_emails", body)
+        self.assertNotIn("bcc_emails", body)
+
+    async def test_rejects_empty_body(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "body must not be empty"):
+            await api.add_ticket_reply(ENV_CONFIG, 1234, " ")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api.add_ticket_reply(ENV_CONFIG, 99999, "On it.")
 
 
 if __name__ == "__main__":

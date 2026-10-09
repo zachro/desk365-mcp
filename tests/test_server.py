@@ -435,6 +435,72 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
                 "create_ticket", {"email": "customer@example.com", "subject": "Help"}
             )
 
+    async def test_add_ticket_reply_posts_reply(self):
+        reply = {"id": 1, "ticket_number": 1234, "body": "On it."}
+        self.mock_api(httpx.Response(200, json=reply))
+
+        result = await self.call_tool("add_ticket_reply", {"ticket_number": 1234, "body": "On it."})
+
+        self.assertEqual(result.structured_content, reply)
+        request = self.requests[0]
+        self.assertEqual(request.method, "POST")
+        self.assertEqual(request.url.path, "/apis/v3/tickets/add_reply")
+        self.assertEqual(dict(request.url.params), {"ticket_number": "1234"})
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        self.assertEqual(
+            json.loads(request.content),
+            {"body": "On it.", "include_prev_ccs": 0, "include_prev_messages": 0},
+        )
+
+    async def test_add_ticket_reply_maps_options_to_api_fields(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+
+        await self.call_tool(
+            "add_ticket_reply",
+            {
+                "ticket_number": 1234,
+                "body": "On it.",
+                "cc_emails": ["a@example.com", "b@example.com"],
+                "bcc_emails": ["c@example.com"],
+                "agent_email": "agent@example.com",
+                "from_email": "support@example.com",
+                "include_prev_ccs": True,
+                "include_prev_messages": True,
+            },
+        )
+
+        self.assertEqual(
+            json.loads(self.requests[0].content),
+            {
+                "body": "On it.",
+                "cc_emails": "a@example.com,b@example.com",
+                "bcc_emails": "c@example.com",
+                "agent_email": "agent@example.com",
+                "from_email": "support@example.com",
+                "include_prev_ccs": 1,
+                "include_prev_messages": 1,
+            },
+        )
+
+    async def test_add_ticket_reply_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [
+            {"body": "On it."},
+            {"ticket_number": 1234},
+            {"ticket_number": 1234, "body": ""},
+        ]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("add_ticket_reply", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_add_ticket_reply_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("add_ticket_reply", {"ticket_number": 99999, "body": "On it."})
+
 
 if __name__ == "__main__":
     unittest.main()
