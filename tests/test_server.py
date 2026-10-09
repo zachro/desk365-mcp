@@ -138,6 +138,79 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("get_ticket_details", {"ticket_number": 99999})
 
+    async def test_get_ticket_conversations_sends_default_params(self):
+        conversations = {
+            "count": 1,
+            "conversations": [
+                {
+                    "id": 1,
+                    "type": "note",
+                    "public_note": False,
+                    "sender_type": "agent",
+                    "body_text": "On it.",
+                }
+            ],
+        }
+        self.mock_api(httpx.Response(200, json=conversations))
+
+        result = await self.call_tool("get_ticket_conversations", {"ticket_number": 1234})
+
+        self.assertEqual(result.structured_content, conversations)
+        request = self.requests[0]
+        self.assertEqual(request.url.path, "/apis/v3/tickets/conversations")
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        self.assertEqual(
+            dict(request.url.params),
+            {
+                "ticket_number": "1234",
+                "sort_by": "earliest_on_top",
+                "include_contact_replies": "1",
+                "include_agent_replies": "1",
+                "include_private_notes": "1",
+                "include_public_notes": "1",
+                "include_forward_messages": "1",
+            },
+        )
+
+    async def test_get_ticket_conversations_converts_options_to_api_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "conversations": []}))
+
+        await self.call_tool(
+            "get_ticket_conversations",
+            {
+                "ticket_number": 1234,
+                "sort_by": "latest_on_top",
+                "include_private_notes": False,
+                "include_forward_messages": False,
+            },
+        )
+
+        params = self.requests[0].url.params
+        self.assertEqual(params["sort_by"], "latest_on_top")
+        self.assertEqual(params["include_contact_replies"], "1")
+        self.assertEqual(params["include_agent_replies"], "1")
+        self.assertEqual(params["include_private_notes"], "0")
+        self.assertEqual(params["include_public_notes"], "1")
+        self.assertEqual(params["include_forward_messages"], "0")
+
+    async def test_get_ticket_conversations_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("get_ticket_conversations")
+        with self.assertRaises(ToolError):
+            await self.call_tool(
+                "get_ticket_conversations", {"ticket_number": 1234, "sort_by": "newest"}
+            )
+
+        self.assertEqual(self.requests, [])
+
+    async def test_get_ticket_conversations_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("get_ticket_conversations", {"ticket_number": 99999})
+
     async def test_create_ticket_posts_only_given_fields(self):
         created = {"ticket_number": 101, "subject": "Printer not working", "status": "Open"}
         self.mock_api(httpx.Response(200, json=created))

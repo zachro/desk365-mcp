@@ -121,7 +121,8 @@ async def get_ticket_details(ticket_number: int) -> dict[str, Any]:
     "cf_<field name>" to a value, or null when the field is empty.
 
     The replies and notes in the ticket's conversation are not included;
-    conversation_count only says how many there are.
+    conversation_count only says how many there are. Use get_ticket_conversations
+    to read them.
 
     Coded values:
     - priority: Low=1, Medium=5, High=10, Urgent=20
@@ -137,6 +138,59 @@ async def get_ticket_details(ticket_number: int) -> dict[str, Any]:
     """
     logger.info('Getting Desk365 ticket details (ticket_number=%s)', ticket_number)
     return await api.get_ticket_details(env_config, ticket_number)
+
+
+@mcp.tool
+async def get_ticket_conversations(
+    ticket_number: int,
+    sort_by: Literal['earliest_on_top', 'latest_on_top'] = 'earliest_on_top',
+    include_contact_replies: bool = True,
+    include_agent_replies: bool = True,
+    include_private_notes: bool = True,
+    include_public_notes: bool = True,
+    include_forward_messages: bool = True,
+) -> dict[str, Any]:
+    """Get the conversation history of one Desk365 ticket: replies, notes and forwards.
+
+    Use this to see what has happened on a ticket since it was opened, such as what
+    the contact and agents have said or what agents noted. The ticket's original
+    description is not included; get it from get_ticket_details.
+
+    Returns {"count": <number of messages>, "agent_reply_count",
+    "contact_reply_count", "public_note_count", "private_note_count",
+    "forward_message_count", "conversations": [<message>, ...]}. Each message has id,
+    type ("reply" or "note"), public_note, created_by (sender email), creator_name,
+    sender_type ("agent" or "contact"), to_address, cc_address, bcc_address and
+    notified_agents (comma-separated emails), body (HTML), body_text (plain text),
+    attachments_count, attachments, created_on ("yyyy-mm-dd hh:mm:ss") and email
+    bounce details. All messages are returned at once; there is no paging.
+
+    Private notes are internal to agents. A message is a private note when its type
+    is "note" and public_note is not true (public_note is null on replies). Treat
+    any note as private unless public_note is true, and don't repeat private notes
+    in anything meant for the contact, such as a drafted reply.
+
+    Args:
+        ticket_number: The ticket's number, as shown in Desk365 (e.g. 1234).
+        sort_by: "earliest_on_top" for oldest message first, "latest_on_top" for
+            newest first.
+        include_contact_replies: Include replies from the contact.
+        include_agent_replies: Include replies from agents.
+        include_private_notes: Include agents' internal notes.
+        include_public_notes: Include public notes.
+        include_forward_messages: Include messages forwarded from the ticket.
+    """
+    logger.info('Getting Desk365 ticket conversations (ticket_number=%s)', ticket_number)
+    return await api.get_ticket_conversations(
+        env_config,
+        ticket_number,
+        sort_by=sort_by,
+        include_contact_replies=include_contact_replies,
+        include_agent_replies=include_agent_replies,
+        include_private_notes=include_private_notes,
+        include_public_notes=include_public_notes,
+        include_forward_messages=include_forward_messages,
+    )
 
 
 @mcp.tool

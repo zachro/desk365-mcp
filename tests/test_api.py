@@ -200,6 +200,76 @@ class GetTicketDetailsTests(ApiTestCase):
         self.assertEqual(error.exception.response.status_code, 404)
 
 
+class GetTicketConversationsTests(ApiTestCase):
+    async def test_returns_parsed_json(self):
+        conversations = {
+            "count": 1,
+            "conversations": [
+                {"id": 1, "type": "reply", "sender_type": "contact", "body_text": "Any update?"}
+            ],
+        }
+        self.mock_api(httpx.Response(200, json=conversations))
+
+        result = await api.get_ticket_conversations(ENV_CONFIG, 1234)
+
+        self.assertEqual(result, conversations)
+        self.assertEqual(self.request.method, "GET")
+        self.assertEqual(self.request.url.path, "/apis/v3/tickets/conversations")
+
+    async def test_sends_default_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "conversations": []}))
+
+        await api.get_ticket_conversations(ENV_CONFIG, 1234)
+
+        self.assertEqual(
+            dict(self.request.url.params),
+            {
+                "ticket_number": "1234",
+                "sort_by": "earliest_on_top",
+                "include_contact_replies": "1",
+                "include_agent_replies": "1",
+                "include_private_notes": "1",
+                "include_public_notes": "1",
+                "include_forward_messages": "1",
+            },
+        )
+
+    async def test_converts_arguments_to_api_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "conversations": []}))
+
+        await api.get_ticket_conversations(
+            ENV_CONFIG,
+            1234,
+            sort_by="latest_on_top",
+            include_contact_replies=False,
+            include_agent_replies=False,
+            include_private_notes=False,
+            include_public_notes=False,
+            include_forward_messages=False,
+        )
+
+        self.assertEqual(
+            dict(self.request.url.params),
+            {
+                "ticket_number": "1234",
+                "sort_by": "latest_on_top",
+                "include_contact_replies": "0",
+                "include_agent_replies": "0",
+                "include_private_notes": "0",
+                "include_public_notes": "0",
+                "include_forward_messages": "0",
+            },
+        )
+
+    async def test_raises_when_ticket_not_found(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(httpx.HTTPStatusError) as error:
+            await api.get_ticket_conversations(ENV_CONFIG, 99999)
+
+        self.assertEqual(error.exception.response.status_code, 404)
+
+
 class CreateTicketTests(ApiTestCase):
     async def test_returns_created_ticket(self):
         created = {"ticket_number": 101, "subject": "Help"}

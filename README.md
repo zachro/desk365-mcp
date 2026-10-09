@@ -11,6 +11,7 @@ It works with any Desk365 account. Everything specific to your account goes in a
 | `ping` | Checks that the Desk365 API is up and reachable. It doesn't check your API key. |
 | `list_tickets` | Lists tickets. It supports paging (30, 50 or 100 per page), sorting by created or updated time, `updated_since`, and filters on status, priority, type, group, assignee, category, subcategory, source, contact, company and custom dropdown fields. |
 | `get_ticket_details` | Gets the full details of one ticket by ticket number, including its description and custom fields. |
+| `get_ticket_conversations` | Gets a ticket's conversation history: contact and agent replies, public and private notes, and forwarded messages. Each type can be left out, and messages can be sorted oldest or newest first. |
 | `create_ticket` | Creates a ticket for a contact's email address. It can set the description, status, priority, type, assignee, group, category, subcategory, form, custom fields, watchers and shared contacts. |
 
 Each tool's docstring in `desk365_mcp/server.py` explains to the LLM when and how to use it.

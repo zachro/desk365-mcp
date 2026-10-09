@@ -115,3 +115,26 @@ async def create_ticket(
     body = {key: value for key, value in body.items() if value is not None}
     response = await _post(env_config, 'tickets/create', body)
     return response.json()
+
+
+async def get_ticket_conversations(
+    env_config: dict[str, str],
+    ticket_number: int,
+    sort_by: str = 'earliest_on_top',
+    include_contact_replies: bool = True,
+    include_agent_replies: bool = True,
+    include_private_notes: bool = True,
+    include_public_notes: bool = True,
+    include_forward_messages: bool = True,
+) -> dict[str, Any]:
+    params = {
+        'ticket_number': str(ticket_number),
+        'sort_by': sort_by,
+        'include_contact_replies': _flag(include_contact_replies),
+        'include_agent_replies': _flag(include_agent_replies),
+        'include_private_notes': _flag(include_private_notes),
+        'include_public_notes': _flag(include_public_notes),
+        'include_forward_messages': _flag(include_forward_messages),
+    }
+    response = await _get(env_config, 'tickets/conversations', params)
+    return response.json()
