@@ -15,6 +15,13 @@ SEARCH_FIELDS = {
 }
 SEARCH_ARCHIVED_TICKETS = 7
 ADVANCED_SEARCH_FIELDS = ('subject', 'ticket_number')
+# Codes for the fields contacts can be sorted by.
+CONTACT_SORT_FIELDS = {
+    'name': 1,
+    'title': 2,
+    'company': 3,
+    'email': 4,
+}
 
 
 def _api_url(env_config: dict[str, str], path: str) -> str:
@@ -383,4 +390,38 @@ async def update_ticket(
     response = await _put(
         env_config, 'tickets/update', body, {'ticket_number': str(ticket_number)}
     )
+    return response.json()
+
+
+async def list_contacts(
+    env_config: dict[str, str],
+    company: str | None = None,
+    offset: int = 0,
+    order_by: str = 'name',
+    order_type: str = 'asc',
+    include_custom_fields: bool = False,
+) -> dict[str, Any]:
+    if order_by not in CONTACT_SORT_FIELDS:
+        raise ValueError(
+            f'Unknown order_by: {order_by}. Use any of: {", ".join(CONTACT_SORT_FIELDS)}.'
+        )
+    params = {
+        'offset': str(offset),
+        'order_by': str(CONTACT_SORT_FIELDS[order_by]),
+        'order_type': order_type,
+        'include_custom_fields': _flag(include_custom_fields),
+    }
+    if company:
+        params['company'] = company
+    response = await _get(env_config, 'contacts', params)
+    return response.json()
+
+
+async def get_contact_details(
+    env_config: dict[str, str], email: str, secondary: bool = False
+) -> dict[str, Any]:
+    if not email.strip():
+        raise ValueError('email must not be empty.')
+    param = 'secondary_email' if secondary else 'primary_email'
+    response = await _get(env_config, 'contacts/details', {param: email})
     return response.json()

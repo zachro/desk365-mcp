@@ -864,5 +864,116 @@ class UpdateTicketTests(ApiTestCase):
             await api.update_ticket(ENV_CONFIG, 99999, status="Closed")
 
 
+class ListContactsTests(ApiTestCase):
+    async def test_returns_parsed_json(self):
+        contacts = {"count": 1, "content": [{"name": "Jane Doe", "email": "jane@example.com"}]}
+        self.mock_api(httpx.Response(200, json=contacts))
+
+        result = await api.list_contacts(ENV_CONFIG)
+
+        self.assertEqual(result, contacts)
+        self.assertEqual(self.request.method, "GET")
+        self.assertEqual(self.request.url.path, "/apis/v3/contacts")
+
+    async def test_sends_default_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "content": []}))
+
+        await api.list_contacts(ENV_CONFIG)
+
+        self.assertEqual(
+            dict(self.request.url.params),
+            {"offset": "0", "order_by": "1", "order_type": "asc", "include_custom_fields": "0"},
+        )
+
+    async def test_converts_arguments_to_api_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "content": []}))
+
+        await api.list_contacts(
+            ENV_CONFIG,
+            company="Example Corp",
+            offset=30,
+            order_by="email",
+            order_type="desc",
+            include_custom_fields=True,
+        )
+
+        self.assertEqual(
+            dict(self.request.url.params),
+            {
+                "company": "Example Corp",
+                "offset": "30",
+                "order_by": "4",
+                "order_type": "desc",
+                "include_custom_fields": "1",
+            },
+        )
+
+    async def test_maps_each_sort_field_to_its_code(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "content": []}))
+
+        for order_by, code in [("name", "1"), ("title", "2"), ("company", "3"), ("email", "4")]:
+            await api.list_contacts(ENV_CONFIG, order_by=order_by)
+            self.assertEqual(self.requests[-1].url.params["order_by"], code)
+
+    async def test_omits_empty_company(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "content": []}))
+
+        await api.list_contacts(ENV_CONFIG, company="")
+
+        self.assertNotIn("company", self.request.url.params)
+
+    async def test_rejects_unknown_sort_field(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "Unknown order_by: phone"):
+            await api.list_contacts(ENV_CONFIG, order_by="phone")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_on_http_error(self):
+        self.mock_api(httpx.Response(401, json={"status": 401, "error": "Unauthorized"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api.list_contacts(ENV_CONFIG)
+
+
+class GetContactDetailsTests(ApiTestCase):
+    async def test_looks_up_by_primary_email(self):
+        contact = {"name": "Jane Doe", "primary_email": "jane@example.com"}
+        self.mock_api(httpx.Response(200, json=contact))
+
+        result = await api.get_contact_details(ENV_CONFIG, "jane@example.com")
+
+        self.assertEqual(result, contact)
+        self.assertEqual(self.request.method, "GET")
+        self.assertEqual(self.request.url.path, "/apis/v3/contacts/details")
+        self.assertEqual(dict(self.request.url.params), {"primary_email": "jane@example.com"})
+
+    async def test_looks_up_by_secondary_email(self):
+        self.mock_api(httpx.Response(200, json={"name": "Jane Doe"}))
+
+        await api.get_contact_details(ENV_CONFIG, "jane@other.example.com", secondary=True)
+
+        self.assertEqual(
+            dict(self.request.url.params), {"secondary_email": "jane@other.example.com"}
+        )
+
+    async def test_rejects_empty_email(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "email must not be empty"):
+            await api.get_contact_details(ENV_CONFIG, " ")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_when_contact_not_found(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(httpx.HTTPStatusError) as error:
+            await api.get_contact_details(ENV_CONFIG, "nobody@example.com")
+
+        self.assertEqual(error.exception.response.status_code, 404)
+
+
 if __name__ == "__main__":
     unittest.main()

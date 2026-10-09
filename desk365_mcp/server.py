@@ -604,6 +604,71 @@ async def add_ticket_note(
     )
 
 
+@mcp.tool
+async def list_contacts(
+    company: str | None = None,
+    offset: int = 0,
+    order_by: Literal['name', 'title', 'company', 'email'] = 'name',
+    order_type: Literal['asc', 'desc'] = 'asc',
+    include_custom_fields: bool = False,
+) -> dict[str, Any]:
+    """List Desk365 contacts (the customers or requesters tickets belong to), sorted
+    by name.
+
+    Use this to find a contact's email address from their name or company, e.g.
+    before create_ticket or filtering list_tickets by contact. It can't search by
+    name, so narrow it with company when you know it. If you already have an email
+    address, use get_contact_details instead. To find tickets mentioning a person's
+    name, search_tickets with search_in ["contacts_and_companies"] is often faster.
+
+    Returns the total number of matching contacts and one page of up to 30
+    contacts. Each contact includes their name, email addresses, title, phone
+    numbers, company, departments, and created and updated times. To fetch the next
+    page, call again with offset increased by 30; stop once offset reaches the
+    total. Paging through every contact uses up the Desk365 API rate limit (as low
+    as 100 calls per hour), so filter by company where possible.
+
+    Args:
+        company: Only return contacts belonging to this company, by its exact name
+            in Desk365.
+        offset: Number of contacts to skip, for paging. Start at 0.
+        order_by: Field to sort by.
+        order_type: "asc" for A to Z, "desc" for Z to A.
+        include_custom_fields: Include the account's custom contact fields.
+    """
+    logger.info('Listing Desk365 contacts (company=%r, offset=%s)', company, offset)
+    return await api.list_contacts(
+        env_config,
+        company=company,
+        offset=offset,
+        order_by=order_by,
+        order_type=order_type,
+        include_custom_fields=include_custom_fields,
+    )
+
+
+@mcp.tool
+async def get_contact_details(email: str, secondary: bool = False) -> dict[str, Any]:
+    """Get a Desk365 contact's details by email address.
+
+    Use this to learn more about the person a ticket belongs to (a ticket's
+    contact_email), such as their company, title or phone numbers. Contacts can have
+    a primary email and secondary emails. Look up by primary email first; if the
+    contact isn't found, try again with secondary set to true.
+
+    Returns the contact: name, primary_email, secondary_emails, title, mobile, phone,
+    company_name, primary_department, secondary_departments, is_deleted (1 if the
+    contact was deleted), created_on, updated_on and custom_fields.
+
+    Args:
+        email: The contact's email address.
+        secondary: Look the contact up by a secondary email instead of their primary
+            email.
+    """
+    logger.info('Getting Desk365 contact details (secondary=%s)', secondary)
+    return await api.get_contact_details(env_config, email, secondary=secondary)
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

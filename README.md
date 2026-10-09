@@ -18,6 +18,8 @@ It works with any Desk365 account. Everything specific to your account goes in a
 | `update_ticket` | Changes an existing ticket's contact, subject, description, SLA, status, priority, type, assignee, group, category, subcategory or custom fields, and adds or removes watchers and shared contacts. Fields that aren't set keep their current values. |
 | `add_ticket_reply` | Sends a reply on a ticket, which is emailed to the contact. It supports CC/BCC, choosing the sending agent and from-address, notifying earlier CCs, and quoting earlier messages. |
 | `add_ticket_note` | Adds a note to a ticket. Notes are private (agents only) by default; a public note is also sent to the contact. It can notify other agents and choose the agent the note is from. |
+| `list_contacts` | Lists contacts 30 at a time, optionally only those in one company, sorted by name, title, company or email. |
+| `get_contact_details` | Gets a contact's details by their primary or secondary email address. |
 
 Each tool's docstring in `desk365_mcp/server.py` explains to the LLM when and how to use it.
 

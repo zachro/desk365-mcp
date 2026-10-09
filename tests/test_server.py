@@ -672,6 +672,93 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("update_ticket", {"ticket_number": 99999, "status": "Closed"})
 
+    async def test_list_contacts_sends_default_params(self):
+        contacts = {"count": 1, "content": [{"name": "Jane Doe", "email": "jane@example.com"}]}
+        self.mock_api(httpx.Response(200, json=contacts))
+
+        result = await self.call_tool("list_contacts")
+
+        self.assertEqual(result.structured_content, contacts)
+        request = self.requests[0]
+        self.assertEqual(request.url.path, "/apis/v3/contacts")
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        self.assertEqual(
+            dict(request.url.params),
+            {"offset": "0", "order_by": "1", "order_type": "asc", "include_custom_fields": "0"},
+        )
+
+    async def test_list_contacts_converts_options_to_api_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "content": []}))
+
+        await self.call_tool(
+            "list_contacts",
+            {
+                "company": "Example Corp",
+                "offset": 60,
+                "order_by": "company",
+                "order_type": "desc",
+                "include_custom_fields": True,
+            },
+        )
+
+        self.assertEqual(
+            dict(self.requests[0].url.params),
+            {
+                "company": "Example Corp",
+                "offset": "60",
+                "order_by": "3",
+                "order_type": "desc",
+                "include_custom_fields": "1",
+            },
+        )
+
+    async def test_list_contacts_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [{"order_by": "phone"}, {"order_type": "up"}]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("list_contacts", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_list_contacts_raises_on_http_error(self):
+        self.mock_api(httpx.Response(401, json={"status": 401, "error": "Unauthorized"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("list_contacts")
+
+    async def test_get_contact_details_looks_up_by_email(self):
+        contact = {"name": "Jane Doe", "primary_email": "jane@example.com"}
+        self.mock_api(httpx.Response(200, json=contact))
+
+        result = await self.call_tool("get_contact_details", {"email": "jane@example.com"})
+        await self.call_tool(
+            "get_contact_details", {"email": "jane@other.example.com", "secondary": True}
+        )
+
+        self.assertEqual(result.structured_content, contact)
+        self.assertEqual(self.requests[0].url.path, "/apis/v3/contacts/details")
+        self.assertEqual(self.requests[0].headers["Authorization"], "test-api-key")
+        self.assertEqual(dict(self.requests[0].url.params), {"primary_email": "jane@example.com"})
+        self.assertEqual(
+            dict(self.requests[1].url.params), {"secondary_email": "jane@other.example.com"}
+        )
+
+    async def test_get_contact_details_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [{}, {"email": ""}]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("get_contact_details", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_get_contact_details_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("get_contact_details", {"email": "nobody@example.com"})
+
 
 if __name__ == "__main__":
     unittest.main()
