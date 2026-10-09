@@ -138,6 +138,96 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("get_ticket_details", {"ticket_number": 99999})
 
+    async def test_create_ticket_posts_only_given_fields(self):
+        created = {"ticket_number": 101, "subject": "Printer not working", "status": "Open"}
+        self.mock_api(httpx.Response(200, json=created))
+
+        result = await self.call_tool(
+            "create_ticket", {"email": "customer@example.com", "subject": "Printer not working"}
+        )
+
+        self.assertEqual(result.structured_content, created)
+        request = self.requests[0]
+        self.assertEqual(request.method, "POST")
+        self.assertEqual(request.url.path, "/apis/v3/tickets/create")
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        self.assertEqual(
+            json.loads(request.content),
+            {"email": "customer@example.com", "subject": "Printer not working"},
+        )
+
+    async def test_create_ticket_maps_fields_to_api_names(self):
+        self.mock_api(httpx.Response(200, json={"ticket_number": 102}))
+
+        await self.call_tool(
+            "create_ticket",
+            {
+                "email": "customer@example.com",
+                "subject": "Refund request",
+                "description": "<p>Charged twice.</p>",
+                "status": "Open",
+                "priority": 10,
+                "type": "Question",
+                "assigned_to": "agent@example.com",
+                "group": "Billing",
+                "category": "Billing",
+                "subcategory": "Disputed Charge",
+                "form_name": "Create Ticket",
+                "custom_fields": {"cf_Country": "USA"},
+                "watchers": ["lead@example.com"],
+                "share_to": ["manager@example.com"],
+            },
+        )
+
+        self.assertEqual(
+            json.loads(self.requests[0].content),
+            {
+                "email": "customer@example.com",
+                "subject": "Refund request",
+                "description": "<p>Charged twice.</p>",
+                "status": "Open",
+                "priority": 10,
+                "type": "Question",
+                "assign_to": "agent@example.com",
+                "group": "Billing",
+                "category": "Billing",
+                "sub_category": "Disputed Charge",
+                "form_name": "Create Ticket",
+                "custom_fields": {"cf_Country": "USA"},
+                "watchers": ["lead@example.com"],
+                "share_to": ["manager@example.com"],
+            },
+        )
+
+    async def test_create_ticket_requires_email_and_subject(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("create_ticket", {"subject": "No contact"})
+        with self.assertRaises(ToolError):
+            await self.call_tool("create_ticket", {"email": "customer@example.com"})
+
+        self.assertEqual(self.requests, [])
+
+    async def test_create_ticket_rejects_unknown_priority(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool(
+                "create_ticket",
+                {"email": "customer@example.com", "subject": "Help", "priority": 3},
+            )
+
+        self.assertEqual(self.requests, [])
+
+    async def test_create_ticket_raises_on_http_error(self):
+        self.mock_api(httpx.Response(400, json={"status": 400, "error": "Bad Request"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool(
+                "create_ticket", {"email": "customer@example.com", "subject": "Help"}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

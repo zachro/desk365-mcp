@@ -139,6 +139,83 @@ async def get_ticket_details(ticket_number: int) -> dict[str, Any]:
     return await api.get_ticket_details(env_config, ticket_number)
 
 
+@mcp.tool
+async def create_ticket(
+    email: str,
+    subject: str,
+    description: str | None = None,
+    status: str | None = None,
+    priority: Literal[1, 5, 10, 20] | None = None,
+    type: str | None = None,
+    assigned_to: str | None = None,
+    group: str | None = None,
+    category: str | None = None,
+    subcategory: str | None = None,
+    form_name: str | None = None,
+    custom_fields: dict[str, Any] | None = None,
+    watchers: list[str] | None = None,
+    share_to: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a new Desk365 support ticket.
+
+    This creates a real ticket that agents and the contact may see, so only call it
+    when the user has asked for a ticket to be created, and confirm the subject,
+    contact and any other details with them first if they are unclear. Each call
+    creates another ticket, so don't retry after a success.
+
+    Only email and subject are required. Leave other fields unset unless the user
+    gives a value; Desk365 then applies the account's defaults (e.g. the default
+    status and priority). Names such as status, type, group, category, subcategory
+    and form_name must exactly match ones configured in the Desk365 account. If you
+    are unsure of the valid names, look at existing tickets from list_tickets or
+    get_ticket_details rather than guessing.
+
+    Returns the created ticket with the same fields as get_ticket_details,
+    including the new ticket_number to share with the user.
+
+    Args:
+        email: Email address of the contact (customer or requester) the ticket is for.
+        subject: Short summary of the issue.
+        description: Full description of the issue, as HTML (e.g. "<p>The printer
+            on floor 2 shows a paper jam error.</p>"). Use <br> or <p> tags for
+            line breaks.
+        status: Ticket status, e.g. "Open" or "Pending". Defaults to the account's
+            default status.
+        priority: Low=1, Medium=5, High=10, Urgent=20.
+        type: Ticket type, e.g. "Question" or "Incident".
+        assigned_to: Email address of the agent to assign the ticket to.
+        group: Name of the agent group to assign the ticket to.
+        category: Ticket category name.
+        subcategory: Ticket subcategory name. It must belong to the given category.
+        form_name: Name of the ticket form to create the ticket with. Defaults to the
+            account's default agent portal form. Some forms have their own custom
+            fields.
+        custom_fields: Values for the account's custom ticket fields, keyed by
+            "cf_<field name>" with the field name's exact case, as they appear in
+            get_ticket_details (e.g. {"cf_Country": "USA"}).
+        watchers: Email addresses of agents to add as watchers.
+        share_to: Email addresses of other contacts to share the ticket with.
+    """
+    logger.info('Creating Desk365 ticket (subject=%r)', subject)
+    return await api.create_ticket(
+        env_config,
+        email=email,
+        subject=subject,
+        description=description,
+        status=status,
+        priority=priority,
+        type=type,
+        assigned_to=assigned_to,
+        group=group,
+        category=category,
+        subcategory=subcategory,
+        form_name=form_name,
+        custom_fields=custom_fields,
+        watchers=watchers,
+        share_to=share_to,
+    )
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

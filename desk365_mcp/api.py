@@ -27,6 +27,15 @@ async def _get(
         return response
 
 
+async def _post(env_config: dict[str, str], path: str, body: dict[str, Any]) -> httpx.Response:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            _api_url(env_config, path), headers=_headers(env_config), json=body
+        )
+        response.raise_for_status()
+        return response
+
+
 async def ping(env_config: dict[str, str]) -> str:
     response = await _get(env_config, 'ping')
     return response.text
@@ -64,4 +73,45 @@ async def list_tickets(
 
 async def get_ticket_details(env_config: dict[str, str], ticket_number: int) -> dict[str, Any]:
     response = await _get(env_config, 'tickets/details', {'ticket_number': str(ticket_number)})
+    return response.json()
+
+
+async def create_ticket(
+    env_config: dict[str, str],
+    email: str,
+    subject: str,
+    description: str | None = None,
+    status: str | None = None,
+    priority: int | None = None,
+    type: str | None = None,
+    assigned_to: str | None = None,
+    group: str | None = None,
+    category: str | None = None,
+    subcategory: str | None = None,
+    form_name: str | None = None,
+    custom_fields: dict[str, Any] | None = None,
+    watchers: list[str] | None = None,
+    share_to: list[str] | None = None,
+) -> dict[str, Any]:
+    # The create endpoint names these fields assign_to and sub_category, unlike
+    # ticket responses, which use assigned_to and subcategory.
+    body = {
+        'email': email,
+        'subject': subject,
+        'description': description,
+        'status': status,
+        'priority': priority,
+        'type': type,
+        'assign_to': assigned_to,
+        'group': group,
+        'category': category,
+        'sub_category': subcategory,
+        'form_name': form_name,
+        'custom_fields': custom_fields,
+        'watchers': watchers,
+        'share_to': share_to,
+    }
+    # Leave out unset fields so Desk365 applies the account's defaults.
+    body = {key: value for key, value in body.items() if value is not None}
+    response = await _post(env_config, 'tickets/create', body)
     return response.json()
