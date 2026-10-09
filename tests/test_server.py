@@ -759,6 +759,50 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("get_contact_details", {"email": "nobody@example.com"})
 
+    async def test_list_kb_articles_returns_titles(self):
+        articles = {"count": 2, "article_titles": ["Reset your password", "Set up VPN"]}
+        self.mock_api(httpx.Response(200, json=articles))
+
+        result = await self.call_tool("list_kb_articles")
+
+        self.assertEqual(result.structured_content, articles)
+        request = self.requests[0]
+        self.assertEqual(request.url.path, "/apis/v3/kb/article/")
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+
+    async def test_list_kb_articles_raises_on_http_error(self):
+        self.mock_api(httpx.Response(500, json={"status": 500, "error": "Server Error"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("list_kb_articles")
+
+    async def test_get_kb_article_requests_article_by_title(self):
+        article = {"article_title": "Set up VPN", "support_url": "https://example.com/vpn"}
+        self.mock_api(httpx.Response(200, json=article))
+
+        result = await self.call_tool("get_kb_article", {"title": "Set up VPN"})
+
+        self.assertEqual(result.structured_content, article)
+        request = self.requests[0]
+        self.assertEqual(request.url.path, "/apis/v3/kb/article/details")
+        self.assertEqual(dict(request.url.params), {"article_name": "Set up VPN"})
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+
+    async def test_get_kb_article_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [{}, {"title": " "}]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("get_kb_article", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_get_kb_article_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("get_kb_article", {"title": "No such article"})
+
 
 if __name__ == "__main__":
     unittest.main()

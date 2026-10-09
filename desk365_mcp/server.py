@@ -669,6 +669,40 @@ async def get_contact_details(email: str, secondary: bool = False) -> dict[str, 
     return await api.get_contact_details(env_config, email, secondary=secondary)
 
 
+@mcp.tool
+async def list_kb_articles() -> dict[str, Any]:
+    """List the titles of all live articles in the Desk365 knowledge base.
+
+    Use this to find help articles relevant to a ticket, e.g. to base a drafted
+    reply on the account's own documentation or to point the contact to an article.
+    Pick likely titles from the list, then read them with get_kb_article. Draft and
+    unpublished articles are not included.
+
+    Returns {"count": <number of live articles>, "article_titles": [<title>, ...]}.
+    """
+    logger.info('Listing Desk365 knowledge base articles')
+    return await api.list_kb_articles(env_config)
+
+
+@mcp.tool
+async def get_kb_article(title: str) -> dict[str, Any]:
+    """Get the full content of a live Desk365 knowledge base article by its title.
+
+    Get the exact title from list_kb_articles first.
+
+    Returns the article: article_title, article_content (HTML),
+    article_content_text (plain text), category_name, folder_name, attachments,
+    created_on, updated_on, article_views, article_likes, article_dislikes,
+    agent_url and support_url. When sharing a link with a contact, use support_url;
+    agent_url only works for agents.
+
+    Args:
+        title: The article's exact title, as returned by list_kb_articles.
+    """
+    logger.info('Getting Desk365 knowledge base article (title=%r)', title)
+    return await api.get_kb_article(env_config, title)
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

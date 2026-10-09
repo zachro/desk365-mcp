@@ -425,3 +425,15 @@ async def get_contact_details(
     param = 'secondary_email' if secondary else 'primary_email'
     response = await _get(env_config, 'contacts/details', {param: email})
     return response.json()
+
+
+async def list_kb_articles(env_config: dict[str, str]) -> dict[str, Any]:
+    response = await _get(env_config, 'kb/article/')
+    return response.json()
+
+
+async def get_kb_article(env_config: dict[str, str], title: str) -> dict[str, Any]:
+    if not title.strip():
+        raise ValueError('title must not be empty.')
+    response = await _get(env_config, 'kb/article/details', {'article_name': title})
+    return response.json()

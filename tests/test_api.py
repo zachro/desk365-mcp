@@ -975,5 +975,62 @@ class GetContactDetailsTests(ApiTestCase):
         self.assertEqual(error.exception.response.status_code, 404)
 
 
+class ListKbArticlesTests(ApiTestCase):
+    async def test_returns_article_titles(self):
+        articles = {"count": 2, "article_titles": ["Reset your password", "Set up VPN"]}
+        self.mock_api(httpx.Response(200, json=articles))
+
+        result = await api.list_kb_articles(ENV_CONFIG)
+
+        self.assertEqual(result, articles)
+        self.assertEqual(self.request.method, "GET")
+        self.assertEqual(str(self.request.url), "https://acme.desk365.io/apis/v3/kb/article/")
+        self.assertEqual(self.request.headers["Authorization"], "test-api-key")
+
+    async def test_raises_on_http_error(self):
+        self.mock_api(httpx.Response(500, json={"status": 500, "error": "Server Error"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api.list_kb_articles(ENV_CONFIG)
+
+
+class GetKbArticleTests(ApiTestCase):
+    async def test_requests_article_by_title(self):
+        article = {"article_title": "Set up VPN", "article_content_text": "Open the app."}
+        self.mock_api(httpx.Response(200, json=article))
+
+        result = await api.get_kb_article(ENV_CONFIG, "Set up VPN")
+
+        self.assertEqual(result, article)
+        self.assertEqual(self.request.method, "GET")
+        self.assertEqual(self.request.url.path, "/apis/v3/kb/article/details")
+        self.assertEqual(dict(self.request.url.params), {"article_name": "Set up VPN"})
+
+    async def test_encodes_special_characters_in_title(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        await api.get_kb_article(ENV_CONFIG, "How do I reset my password? (Mac & PC)")
+
+        self.assertEqual(
+            self.request.url.params["article_name"], "How do I reset my password? (Mac & PC)"
+        )
+
+    async def test_rejects_empty_title(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "title must not be empty"):
+            await api.get_kb_article(ENV_CONFIG, "")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_when_article_not_found(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(httpx.HTTPStatusError) as error:
+            await api.get_kb_article(ENV_CONFIG, "No such article")
+
+        self.assertEqual(error.exception.response.status_code, 404)
+
+
 if __name__ == "__main__":
     unittest.main()

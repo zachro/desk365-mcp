@@ -1,6 +1,6 @@
 # desk365-mcp
 
-An [MCP](https://modelcontextprotocol.io) server for [Desk365](https://www.desk365.io), the help desk software. It lets an MCP client such as Claude Code or open-source/self-hosted LLMs work with your Desk365 tickets through the [Desk365 API (v3)](https://help.desk365.io/en/articles/desk365-api/).
+An [MCP](https://modelcontextprotocol.io) server for [Desk365](https://www.desk365.io), the help desk software. It lets an MCP client such as Claude Code or open-source/self-hosted LLMs work with your Desk365 tickets, contacts and knowledge base through the [Desk365 API (v3)](https://help.desk365.io/en/articles/desk365-api/).
 
 It works with any Desk365 account. Everything specific to your account goes in an env file, so you don't need to change any code.
 
@@ -20,6 +20,8 @@ It works with any Desk365 account. Everything specific to your account goes in a
 | `add_ticket_note` | Adds a note to a ticket. Notes are private (agents only) by default; a public note is also sent to the contact. It can notify other agents and choose the agent the note is from. |
 | `list_contacts` | Lists contacts 30 at a time, optionally only those in one company, sorted by name, title, company or email. |
 | `get_contact_details` | Gets a contact's details by their primary or secondary email address. |
+| `list_kb_articles` | Lists the titles of all live knowledge base articles. |
+| `get_kb_article` | Gets a live knowledge base article's full content and links by its title. |
 
 Each tool's docstring in `desk365_mcp/server.py` explains to the LLM when and how to use it.
 
