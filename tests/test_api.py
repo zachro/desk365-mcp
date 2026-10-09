@@ -93,6 +93,25 @@ class RequestTests(ApiTestCase):
             "https://acme.desk365.io/apis/v3/tickets/add_note?ticket_number=10",
         )
 
+    async def test_put_sends_auth_json_body_and_params(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        await api._put(ENV_CONFIG, "tickets/update", {"status": "Closed"}, {"ticket_number": "10"})
+
+        self.assertEqual(self.request.method, "PUT")
+        self.assertEqual(
+            str(self.request.url),
+            "https://acme.desk365.io/apis/v3/tickets/update?ticket_number=10",
+        )
+        self.assertEqual(self.request.headers["Authorization"], "test-api-key")
+        self.assertEqual(json.loads(self.request.content), {"status": "Closed"})
+
+    async def test_put_raises_on_http_error(self):
+        self.mock_api(httpx.Response(400, json={"status": 400, "error": "Bad Request"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api._put(ENV_CONFIG, "tickets/update", {})
+
     async def test_get_raises_on_http_error(self):
         self.mock_api(httpx.Response(401, json={"status": 401, "error": "Unauthorized"}))
 
@@ -742,6 +761,107 @@ class AddTicketNoteTests(ApiTestCase):
 
         with self.assertRaises(httpx.HTTPStatusError):
             await api.add_ticket_note(ENV_CONFIG, 99999, "Checked logs.")
+
+
+class UpdateTicketTests(ApiTestCase):
+    async def test_returns_updated_ticket(self):
+        ticket = {"ticket_number": 1234, "status": "Closed"}
+        self.mock_api(httpx.Response(200, json=ticket))
+
+        result = await api.update_ticket(ENV_CONFIG, 1234, status="Closed")
+
+        self.assertEqual(result, ticket)
+        self.assertEqual(self.request.method, "PUT")
+        self.assertEqual(self.request.url.path, "/apis/v3/tickets/update")
+        self.assertEqual(dict(self.request.url.params), {"ticket_number": "1234"})
+
+    async def test_sends_only_given_fields(self):
+        self.mock_api(httpx.Response(200, json={"ticket_number": 1234}))
+
+        await api.update_ticket(ENV_CONFIG, 1234, status="Pending", priority=20)
+
+        self.assertEqual(json.loads(self.request.content), {"status": "Pending", "priority": 20})
+
+    async def test_maps_arguments_to_api_field_names(self):
+        self.mock_api(httpx.Response(200, json={"ticket_number": 1234}))
+
+        await api.update_ticket(
+            ENV_CONFIG,
+            1234,
+            contact_email="customer@example.com",
+            subject="Refund request",
+            description="<p>Charged twice.</p>",
+            sla="Standard SLA",
+            status="Open",
+            priority=10,
+            type="Question",
+            assigned_to="agent@example.com",
+            group="Billing",
+            category="Billing",
+            subcategory="Disputed Charge",
+            custom_fields={"cf_Country": "USA"},
+            add_watchers=["lead@example.com"],
+            remove_watchers=["old-lead@example.com"],
+            add_share_to=["manager@example.com"],
+            remove_share_to=["old-manager@example.com"],
+        )
+
+        self.assertEqual(
+            json.loads(self.request.content),
+            {
+                "contact_email": "customer@example.com",
+                "subject": "Refund request",
+                "description": "<p>Charged twice.</p>",
+                "sla": "Standard SLA",
+                "status": "Open",
+                "priority": 10,
+                "type": "Question",
+                "assign_to": "agent@example.com",
+                "group": "Billing",
+                "category": "Billing",
+                "sub_category": "Disputed Charge",
+                "custom_fields": {"cf_Country": "USA"},
+                "watchers": {"add": ["lead@example.com"], "remove": ["old-lead@example.com"]},
+                "share_to": {
+                    "add": ["manager@example.com"],
+                    "remove": ["old-manager@example.com"],
+                },
+            },
+        )
+
+    async def test_sends_only_the_watcher_lists_given(self):
+        self.mock_api(httpx.Response(200, json={"ticket_number": 1234}))
+
+        await api.update_ticket(
+            ENV_CONFIG, 1234, remove_watchers=["lead@example.com"], add_share_to=[]
+        )
+
+        self.assertEqual(
+            json.loads(self.request.content), {"watchers": {"remove": ["lead@example.com"]}}
+        )
+
+    async def test_passes_unassign_value_through(self):
+        self.mock_api(httpx.Response(200, json={"ticket_number": 1234}))
+
+        await api.update_ticket(ENV_CONFIG, 1234, assigned_to="--", group="--")
+
+        self.assertEqual(json.loads(self.request.content), {"assign_to": "--", "group": "--"})
+
+    async def test_rejects_update_with_no_changes(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for kwargs in [{}, {"custom_fields": {}}, {"add_watchers": [], "remove_share_to": []}]:
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaisesRegex(ValueError, "Nothing to update"):
+                    await api.update_ticket(ENV_CONFIG, 1234, **kwargs)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api.update_ticket(ENV_CONFIG, 99999, status="Closed")
 
 
 if __name__ == "__main__":

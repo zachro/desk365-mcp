@@ -418,6 +418,93 @@ async def create_ticket(
 
 
 @mcp.tool
+async def update_ticket(
+    ticket_number: int,
+    contact_email: str | None = None,
+    subject: str | None = None,
+    description: str | None = None,
+    sla: str | None = None,
+    status: str | None = None,
+    priority: Literal[1, 5, 10, 20] | None = None,
+    type: str | None = None,
+    assigned_to: str | None = None,
+    group: str | None = None,
+    category: str | None = None,
+    subcategory: str | None = None,
+    custom_fields: dict[str, Any] | None = None,
+    add_watchers: list[str] | None = None,
+    remove_watchers: list[str] | None = None,
+    add_share_to: list[str] | None = None,
+    remove_share_to: list[str] | None = None,
+) -> dict[str, Any]:
+    """Change the properties of an existing Desk365 ticket, such as its status, priority
+    or assignee.
+
+    Use this to close, resolve, escalate, reassign or recategorize a ticket. Only call
+    it when the user has asked for the change. Set only the fields that should
+    change; every field left unset keeps its current value. At least one field must
+    be set.
+
+    Names such as status, type, group, category, subcategory and sla must exactly
+    match ones configured in the Desk365 account. If you are unsure of the valid
+    names, look at existing tickets from list_tickets or get_ticket_details rather
+    than guessing. To clear assigned_to, group, category or subcategory, set it to
+    "--".
+
+    Returns the updated ticket with the same fields as get_ticket_details. Check it to
+    confirm the change took effect.
+
+    Args:
+        ticket_number: The ticket's number, as shown in Desk365 (e.g. 1234).
+        contact_email: Email address of the contact to move the ticket to. This
+            changes who the ticket belongs to, so only set it when asked.
+        subject: New subject, replacing the current one.
+        description: New description as HTML, replacing the whole current
+            description. To add information without losing the original, add a note
+            with add_ticket_note instead.
+        sla: Name of the SLA policy to apply.
+        status: New status, e.g. "Open", "Pending", "Resolved" or "Closed".
+        priority: Low=1, Medium=5, High=10, Urgent=20.
+        type: Ticket type, e.g. "Question" or "Incident".
+        assigned_to: Email address of the agent to assign the ticket to, or "--" to
+            unassign it.
+        group: Name of the agent group to assign the ticket to, or "--" to clear it.
+        category: Ticket category name, or "--" to clear it.
+        subcategory: Ticket subcategory name, or "--" to clear it. It must belong to
+            the ticket's category.
+        custom_fields: New values for the account's custom ticket fields, keyed by
+            "cf_<field name>" with the field name's exact case, as they appear in
+            get_ticket_details (e.g. {"cf_Country": "USA"}). Fields not listed keep
+            their values.
+        add_watchers: Email addresses of agents to add as watchers.
+        remove_watchers: Email addresses of agents to remove as watchers.
+        add_share_to: Email addresses of contacts to share the ticket with.
+        remove_share_to: Email addresses of contacts to stop sharing the ticket with.
+    """
+    logger.info('Updating Desk365 ticket (ticket_number=%s)', ticket_number)
+    return await api.update_ticket(
+        env_config,
+        ticket_number,
+        contact_email=contact_email,
+        subject=subject,
+        description=description,
+        sla=sla,
+        status=status,
+        priority=priority,
+        type=type,
+        assigned_to=assigned_to,
+        group=group,
+        category=category,
+        subcategory=subcategory,
+        custom_fields=custom_fields,
+        add_watchers=add_watchers,
+        remove_watchers=remove_watchers,
+        add_share_to=add_share_to,
+        remove_share_to=remove_share_to,
+    )
+
+
+@mcp.tool
 async def add_ticket_reply(
     ticket_number: int,
     body: str,

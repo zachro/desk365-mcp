@@ -15,6 +15,7 @@ It works with any Desk365 account. Everything specific to your account goes in a
 | `get_ticket_details` | Gets the full details of one ticket by ticket number, including its description and custom fields. |
 | `get_ticket_conversations` | Gets a ticket's conversation history: contact and agent replies, public and private notes, and forwarded messages. Each type can be left out, and messages can be sorted oldest or newest first. |
 | `create_ticket` | Creates a ticket for a contact's email address. It can set the description, status, priority, type, assignee, group, category, subcategory, form, custom fields, watchers and shared contacts. |
+| `update_ticket` | Changes an existing ticket's contact, subject, description, SLA, status, priority, type, assignee, group, category, subcategory or custom fields, and adds or removes watchers and shared contacts. Fields that aren't set keep their current values. |
 | `add_ticket_reply` | Sends a reply on a ticket, which is emailed to the contact. It supports CC/BCC, choosing the sending agent and from-address, notifying earlier CCs, and quoting earlier messages. |
 | `add_ticket_note` | Adds a note to a ticket. Notes are private (agents only) by default; a public note is also sent to the contact. It can notify other agents and choose the agent the note is from. |
 

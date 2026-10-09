@@ -588,6 +588,90 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("add_ticket_note", {"ticket_number": 99999, "body": "Checked."})
 
+    async def test_update_ticket_puts_given_fields(self):
+        ticket = {"ticket_number": 1234, "status": "Resolved"}
+        self.mock_api(httpx.Response(200, json=ticket))
+
+        result = await self.call_tool(
+            "update_ticket", {"ticket_number": 1234, "status": "Resolved"}
+        )
+
+        self.assertEqual(result.structured_content, ticket)
+        request = self.requests[0]
+        self.assertEqual(request.method, "PUT")
+        self.assertEqual(request.url.path, "/apis/v3/tickets/update")
+        self.assertEqual(dict(request.url.params), {"ticket_number": "1234"})
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        self.assertEqual(json.loads(request.content), {"status": "Resolved"})
+
+    async def test_update_ticket_maps_fields_to_api_names(self):
+        self.mock_api(httpx.Response(200, json={"ticket_number": 1234}))
+
+        await self.call_tool(
+            "update_ticket",
+            {
+                "ticket_number": 1234,
+                "contact_email": "customer@example.com",
+                "subject": "Refund request",
+                "description": "<p>Charged twice.</p>",
+                "sla": "Standard SLA",
+                "status": "Open",
+                "priority": 10,
+                "type": "Question",
+                "assigned_to": "agent@example.com",
+                "group": "Billing",
+                "category": "Billing",
+                "subcategory": "Disputed Charge",
+                "custom_fields": {"cf_Country": "USA"},
+                "add_watchers": ["lead@example.com"],
+                "remove_watchers": ["old-lead@example.com"],
+                "add_share_to": ["manager@example.com"],
+                "remove_share_to": ["old-manager@example.com"],
+            },
+        )
+
+        self.assertEqual(
+            json.loads(self.requests[0].content),
+            {
+                "contact_email": "customer@example.com",
+                "subject": "Refund request",
+                "description": "<p>Charged twice.</p>",
+                "sla": "Standard SLA",
+                "status": "Open",
+                "priority": 10,
+                "type": "Question",
+                "assign_to": "agent@example.com",
+                "group": "Billing",
+                "category": "Billing",
+                "sub_category": "Disputed Charge",
+                "custom_fields": {"cf_Country": "USA"},
+                "watchers": {"add": ["lead@example.com"], "remove": ["old-lead@example.com"]},
+                "share_to": {
+                    "add": ["manager@example.com"],
+                    "remove": ["old-manager@example.com"],
+                },
+            },
+        )
+
+    async def test_update_ticket_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [
+            {"status": "Closed"},
+            {"ticket_number": 1234},
+            {"ticket_number": 1234, "priority": 3},
+        ]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("update_ticket", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_update_ticket_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("update_ticket", {"ticket_number": 99999, "status": "Closed"})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -59,6 +59,20 @@ async def _post(
         return response
 
 
+async def _put(
+    env_config: dict[str, str],
+    path: str,
+    body: dict[str, Any],
+    params: dict[str, str] | None = None,
+) -> httpx.Response:
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            _api_url(env_config, path), headers=_headers(env_config), json=body, params=params
+        )
+        response.raise_for_status()
+        return response
+
+
 async def ping(env_config: dict[str, str]) -> str:
     response = await _get(env_config, 'ping')
     return response.text
@@ -315,5 +329,58 @@ async def add_ticket_note(
     payload = {key: value for key, value in payload.items() if value is not None}
     response = await _post(
         env_config, 'tickets/add_note', payload, {'ticket_number': str(ticket_number)}
+    )
+    return response.json()
+
+
+def _add_remove(add: list[str] | None, remove: list[str] | None) -> dict[str, list[str]] | None:
+    changes = {'add': add, 'remove': remove}
+    changes = {key: value for key, value in changes.items() if value}
+    return changes or None
+
+
+async def update_ticket(
+    env_config: dict[str, str],
+    ticket_number: int,
+    contact_email: str | None = None,
+    subject: str | None = None,
+    description: str | None = None,
+    sla: str | None = None,
+    status: str | None = None,
+    priority: int | None = None,
+    type: str | None = None,
+    assigned_to: str | None = None,
+    group: str | None = None,
+    category: str | None = None,
+    subcategory: str | None = None,
+    custom_fields: dict[str, Any] | None = None,
+    add_watchers: list[str] | None = None,
+    remove_watchers: list[str] | None = None,
+    add_share_to: list[str] | None = None,
+    remove_share_to: list[str] | None = None,
+) -> dict[str, Any]:
+    # Like the create endpoint, the update endpoint uses assign_to and sub_category.
+    body = {
+        'contact_email': contact_email,
+        'subject': subject,
+        'description': description,
+        'sla': sla,
+        'status': status,
+        'priority': priority,
+        'type': type,
+        'assign_to': assigned_to,
+        'group': group,
+        'category': category,
+        'sub_category': subcategory,
+        'custom_fields': custom_fields or None,
+        'watchers': _add_remove(add_watchers, remove_watchers),
+        'share_to': _add_remove(add_share_to, remove_share_to),
+    }
+    # Desk365 leaves any field missing from the body unchanged.
+    body = {key: value for key, value in body.items() if value is not None}
+    if not body:
+        raise ValueError('Nothing to update: set at least one field to change.')
+    response = await _put(
+        env_config, 'tickets/update', body, {'ticket_number': str(ticket_number)}
     )
     return response.json()
