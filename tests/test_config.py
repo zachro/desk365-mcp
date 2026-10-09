@@ -5,7 +5,8 @@ import unittest
 from unittest.mock import patch
 
 
-CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.py"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = PROJECT_ROOT / "desk365_mcp" / "config.py"
 
 
 class ConfigTests(unittest.TestCase):
@@ -35,7 +36,7 @@ class ConfigTests(unittest.TestCase):
 
         message = str(error.exception)
         self.assertIn("Missing required environment variables: API_KEY", message)
-        self.assertIn(str(CONFIG_PATH.parent / ".env"), message)
+        self.assertIn(str(PROJECT_ROOT / ".env"), message)
         self.assertIn("or as explicit environment variables.", message)
 
     def test_empty_api_key_is_rejected(self):
