@@ -9,16 +9,20 @@ REQUIRED_ENV_VARS = [
 ]
 
 
-def _get_env_config() -> dict[str, str]:
-    load_dotenv()
+def get_env_file(stage: str | None = None) -> Path:
+    return PROJECT_ROOT / (f'{stage}.env' if stage else '.env')
+
+
+def get_env_config(stage: str | None = None) -> dict[str, str]:
+    env_file = get_env_file(stage)
+    if stage and not env_file.is_file():
+        raise FileNotFoundError(f'Env file for stage "{stage}" not found: {env_file}')
+    load_dotenv(env_file)
     missing = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
     if missing:
         raise ValueError(
             'Missing required environment variables: '
-            f'{", ".join(missing)}'
-            f'Set them in {PROJECT_ROOT / ".env"} or as explicit environment variables.'
+            f'{", ".join(missing)}. '
+            f'Set them in {env_file} or as explicit environment variables.'
         )
     return {var: os.environ[var] for var in REQUIRED_ENV_VARS}
-
-
-ENV_CONFIG = _get_env_config()
