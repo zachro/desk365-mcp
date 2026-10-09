@@ -29,6 +29,11 @@ def _flag(value: bool) -> str:
     return '1' if value else '0'
 
 
+def _agent_email(env_config: dict[str, str], agent_email: str | None) -> str | None:
+    # With no agent email at all, Desk365 attributes the message to the API key's owner.
+    return agent_email or env_config.get('DEFAULT_AGENT_EMAIL')
+
+
 async def _get(
     env_config: dict[str, str], path: str, params: dict[str, str] | None = None
 ) -> httpx.Response:
@@ -279,7 +284,7 @@ async def add_ticket_reply(
         'body': body,
         'cc_emails': ','.join(cc_emails) if cc_emails else None,
         'bcc_emails': ','.join(bcc_emails) if bcc_emails else None,
-        'agent_email': agent_email,
+        'agent_email': _agent_email(env_config, agent_email),
         'from_email': from_email,
         'include_prev_ccs': int(include_prev_ccs),
         'include_prev_messages': int(include_prev_messages),
@@ -305,7 +310,7 @@ async def add_ticket_note(
         'body': body,
         'private_note': int(private),
         'notify_emails': ','.join(notify_emails) if notify_emails else None,
-        'agent_email': agent_email,
+        'agent_email': _agent_email(env_config, agent_email),
     }
     payload = {key: value for key, value in payload.items() if value is not None}
     response = await _post(

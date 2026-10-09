@@ -42,7 +42,13 @@ Then fill in `.env`:
 | `API_KEY` | Your Desk365 API key. |
 | `SUBDOMAIN` | Your Desk365 subdomain: `yourcompany` in `https://yourcompany.desk365.io`. Each API key works only with its own subdomain. |
 
-Both are required. You can also set them as ordinary environment variables instead of using a file. Env files are ignored by git, so your key won't be committed.
+Both are required. You can also set this optional variable:
+
+| Variable | Description |
+| --- | --- |
+| `DEFAULT_AGENT_EMAIL` | Email address of the agent that replies and notes are sent as when the LLM doesn't name one. If unset, they come from the owner of the API key. |
+
+You can also set any of these as ordinary environment variables instead of using a file. Env files are ignored by git, so your key won't be committed.
 
 ## Running
 

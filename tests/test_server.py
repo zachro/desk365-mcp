@@ -482,6 +482,19 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
+    async def test_add_ticket_reply_uses_default_agent_email(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+        server.env_config["DEFAULT_AGENT_EMAIL"] = "default@example.com"
+
+        await self.call_tool("add_ticket_reply", {"ticket_number": 1234, "body": "On it."})
+        await self.call_tool(
+            "add_ticket_reply",
+            {"ticket_number": 1234, "body": "On it.", "agent_email": "agent@example.com"},
+        )
+
+        self.assertEqual(json.loads(self.requests[0].content)["agent_email"], "default@example.com")
+        self.assertEqual(json.loads(self.requests[1].content)["agent_email"], "agent@example.com")
+
     async def test_add_ticket_reply_rejects_invalid_input(self):
         self.mock_api(httpx.Response(200, json={}))
 
@@ -542,6 +555,19 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
                 "agent_email": "agent@example.com",
             },
         )
+
+    async def test_add_ticket_note_uses_default_agent_email(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+        server.env_config["DEFAULT_AGENT_EMAIL"] = "default@example.com"
+
+        await self.call_tool("add_ticket_note", {"ticket_number": 1234, "body": "Checked."})
+        await self.call_tool(
+            "add_ticket_note",
+            {"ticket_number": 1234, "body": "Checked.", "agent_email": "agent@example.com"},
+        )
+
+        self.assertEqual(json.loads(self.requests[0].content)["agent_email"], "default@example.com")
+        self.assertEqual(json.loads(self.requests[1].content)["agent_email"], "agent@example.com")
 
     async def test_add_ticket_note_rejects_invalid_input(self):
         self.mock_api(httpx.Response(200, json={}))

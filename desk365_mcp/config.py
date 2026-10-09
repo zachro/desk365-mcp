@@ -8,6 +8,9 @@ REQUIRED_ENV_VARS = [
     'API_KEY',
     'SUBDOMAIN',
 ]
+OPTIONAL_ENV_VARS = [
+    'DEFAULT_AGENT_EMAIL',
+]
 
 
 def get_env_file(stage: str | None = None) -> Path:
@@ -26,4 +29,6 @@ def get_env_config(stage: str | None = None) -> dict[str, str]:
             f'{", ".join(missing)}. '
             f'Set them in {env_file} or as explicit environment variables.'
         )
-    return {var: os.environ[var] for var in REQUIRED_ENV_VARS}
+    config = {var: os.environ[var] for var in REQUIRED_ENV_VARS}
+    config.update({var: os.environ[var] for var in OPTIONAL_ENV_VARS if os.getenv(var)})
+    return config

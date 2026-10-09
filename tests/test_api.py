@@ -20,6 +20,19 @@ class HelperTests(unittest.TestCase):
     def test_headers_send_api_key_as_authorization(self):
         self.assertEqual(api._headers(ENV_CONFIG), {"Authorization": "test-api-key"})
 
+    def test_agent_email_prefers_explicit_value(self):
+        env_config = {**ENV_CONFIG, "DEFAULT_AGENT_EMAIL": "default@example.com"}
+
+        self.assertEqual(api._agent_email(env_config, "agent@example.com"), "agent@example.com")
+
+    def test_agent_email_falls_back_to_default(self):
+        env_config = {**ENV_CONFIG, "DEFAULT_AGENT_EMAIL": "default@example.com"}
+
+        self.assertEqual(api._agent_email(env_config, None), "default@example.com")
+
+    def test_agent_email_is_none_without_default(self):
+        self.assertIsNone(api._agent_email(ENV_CONFIG, None))
+
     def test_flag_converts_bool_to_api_string(self):
         self.assertEqual(api._flag(True), "1")
         self.assertEqual(api._flag(False), "0")
@@ -608,6 +621,22 @@ class AddTicketReplyTests(ApiTestCase):
             },
         )
 
+    async def test_uses_default_agent_email_when_unset(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+        env_config = {**ENV_CONFIG, "DEFAULT_AGENT_EMAIL": "default@example.com"}
+
+        await api.add_ticket_reply(env_config, 1234, "On it.")
+
+        self.assertEqual(json.loads(self.request.content)["agent_email"], "default@example.com")
+
+    async def test_explicit_agent_email_overrides_default(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+        env_config = {**ENV_CONFIG, "DEFAULT_AGENT_EMAIL": "default@example.com"}
+
+        await api.add_ticket_reply(env_config, 1234, "On it.", agent_email="agent@example.com")
+
+        self.assertEqual(json.loads(self.request.content)["agent_email"], "agent@example.com")
+
     async def test_omits_empty_email_lists(self):
         self.mock_api(httpx.Response(200, json={"id": 1}))
 
@@ -674,6 +703,24 @@ class AddTicketNoteTests(ApiTestCase):
                 "agent_email": "agent@example.com",
             },
         )
+
+    async def test_uses_default_agent_email_when_unset(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+        env_config = {**ENV_CONFIG, "DEFAULT_AGENT_EMAIL": "default@example.com"}
+
+        await api.add_ticket_note(env_config, 1234, "Checked logs.")
+
+        self.assertEqual(json.loads(self.request.content)["agent_email"], "default@example.com")
+
+    async def test_explicit_agent_email_overrides_default(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+        env_config = {**ENV_CONFIG, "DEFAULT_AGENT_EMAIL": "default@example.com"}
+
+        await api.add_ticket_note(
+            env_config, 1234, "Checked logs.", agent_email="agent@example.com"
+        )
+
+        self.assertEqual(json.loads(self.request.content)["agent_email"], "agent@example.com")
 
     async def test_omits_empty_notify_emails(self):
         self.mock_api(httpx.Response(200, json={"id": 1}))

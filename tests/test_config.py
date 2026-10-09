@@ -24,6 +24,29 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(result, {"API_KEY": "test-api-key", "SUBDOMAIN": "acme"})
 
+    def test_includes_optional_variables_when_set(self):
+        os.environ.update(
+            API_KEY="test-api-key", SUBDOMAIN="acme", DEFAULT_AGENT_EMAIL="agent@example.com"
+        )
+
+        result = config.get_env_config()
+
+        self.assertEqual(
+            result,
+            {
+                "API_KEY": "test-api-key",
+                "SUBDOMAIN": "acme",
+                "DEFAULT_AGENT_EMAIL": "agent@example.com",
+            },
+        )
+
+    def test_omits_empty_optional_variables(self):
+        os.environ.update(API_KEY="test-api-key", SUBDOMAIN="acme", DEFAULT_AGENT_EMAIL="")
+
+        result = config.get_env_config()
+
+        self.assertNotIn("DEFAULT_AGENT_EMAIL", result)
+
     def test_no_stage_loads_bare_env_file(self):
         os.environ.update(API_KEY="test-api-key", SUBDOMAIN="acme")
 

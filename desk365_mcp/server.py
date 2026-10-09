@@ -312,10 +312,10 @@ async def get_ticket_conversations(
     attachments_count, attachments, created_on ("yyyy-mm-dd hh:mm:ss") and email
     bounce details. All messages are returned at once; there is no paging.
 
-    Private notes are internal to agents. A message is a private note when its type
-    is "note" and public_note is not true (public_note is null on replies). Treat
-    any note as private unless public_note is true, and don't repeat private notes
-    in anything meant for the contact, such as a drafted reply.
+    Private notes are internal to agents. For notes, public_note is true on public
+    notes (which are also sent to the contact) and false on private notes; it is
+    null on replies. Treat any note as private unless public_note is true, and don't
+    repeat private notes in anything meant for the contact, such as a drafted reply.
 
     Args:
         ticket_number: The ticket's number, as shown in Desk365 (e.g. 1234).
@@ -446,7 +446,8 @@ async def add_ticket_reply(
         cc_emails: Email addresses to CC on the reply.
         bcc_emails: Email addresses to BCC on the reply.
         agent_email: Email address of the agent the reply is from. Leave unset unless
-            the user says which agent should send it.
+            the user says which agent should send it; it then comes from the server's
+            default agent, or the owner of the server's API key.
         from_email: Support email address to send from. Defaults to the account's
             main support address.
         include_prev_ccs: Also send to the addresses CC'd earlier on the ticket.
@@ -498,7 +499,8 @@ async def add_ticket_note(
             that is sent to the contact.
         notify_emails: Email addresses of agents to notify about the note.
         agent_email: Email address of the agent the note is from. Leave unset unless
-            the user says which agent should add it.
+            the user says which agent should add it; it then comes from the server's
+            default agent, or the owner of the server's API key.
     """
     logger.info(
         'Adding %s note to Desk365 ticket (ticket_number=%s)',
