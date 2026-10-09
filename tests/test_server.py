@@ -112,6 +112,140 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("list_tickets")
 
+    async def test_search_tickets_sends_default_params(self):
+        results = {"count": 1, "tickets": [{"ticket_number": 10, "subject": "Printer offline"}]}
+        self.mock_api(httpx.Response(200, json=results))
+
+        result = await self.call_tool("search_tickets", {"query": "printer offline"})
+
+        self.assertEqual(result.structured_content, results)
+        request = self.requests[0]
+        self.assertEqual(request.url.path, "/apis/v3/tickets/search")
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        params = dict(request.url.params)
+        self.assertEqual(
+            json.loads(params.pop("search_query")),
+            {"query": "printer offline", "search_in": [1, 2, 3, 4, 5, 6]},
+        )
+        self.assertEqual(
+            params,
+            {
+                "search_type": "1",
+                "ticket_count": "30",
+                "offset": "0",
+                "include_description": "0",
+                "include_custom_fields": "0",
+                "include_survey_details": "0",
+                "order_by": "relevance",
+                "include_merged": "1",
+            },
+        )
+
+    async def test_search_tickets_converts_options_to_api_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "tickets": []}))
+
+        await self.call_tool(
+            "search_tickets",
+            {
+                "query": "invoice",
+                "search_in": ["subject", "conversations"],
+                "include_archived": True,
+                "ticket_count": 50,
+                "offset": 50,
+                "include_description": True,
+                "order_by": "created_time",
+                "include_merged": False,
+            },
+        )
+
+        params = self.requests[0].url.params
+        self.assertEqual(
+            json.loads(params["search_query"]), {"query": "invoice", "search_in": [1, 3, 7]}
+        )
+        self.assertEqual(params["ticket_count"], "50")
+        self.assertEqual(params["offset"], "50")
+        self.assertEqual(params["include_description"], "1")
+        self.assertEqual(params["order_by"], "created_time")
+        self.assertEqual(params["include_merged"], "0")
+
+    async def test_search_tickets_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [
+            {},
+            {"query": ""},
+            {"query": "invoice", "search_in": ["notes"]},
+            {"query": "invoice", "ticket_count": 25},
+            {"query": "invoice", "order_by": "priority"},
+        ]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("search_tickets", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_search_tickets_raises_on_http_error(self):
+        self.mock_api(httpx.Response(429, json={"status": 429, "error": "Too Many Requests"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("search_tickets", {"query": "invoice"})
+
+    async def test_advanced_search_tickets_sends_search_terms(self):
+        results = {"count": 1, "tickets": [{"ticket_number": 130}]}
+        self.mock_api(httpx.Response(200, json=results))
+
+        result = await self.call_tool(
+            "advanced_search_tickets",
+            {"terms": {"subject": "VPN", "cf_Site": "Denver"}, "order_by": "updated_time"},
+        )
+
+        self.assertEqual(result.structured_content, results)
+        request = self.requests[0]
+        self.assertEqual(request.url.path, "/apis/v3/tickets/search")
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        params = dict(request.url.params)
+        self.assertEqual(
+            json.loads(params.pop("search_query")),
+            {
+                "search_term": [
+                    {"query": "VPN", "search_in": ["subject"]},
+                    {"query": "Denver", "search_in": ["cf_Site"]},
+                ]
+            },
+        )
+        self.assertEqual(
+            params,
+            {
+                "search_type": "2",
+                "ticket_count": "30",
+                "offset": "0",
+                "include_description": "0",
+                "include_custom_fields": "0",
+                "include_survey_details": "0",
+                "order_by": "updated_time",
+                "include_merged": "1",
+            },
+        )
+
+    async def test_advanced_search_tickets_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [
+            {},
+            {"terms": {}},
+            {"terms": {"status": "Open"}},
+            {"terms": {"subject": "VPN"}, "ticket_count": 25},
+        ]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("advanced_search_tickets", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_advanced_search_tickets_raises_on_http_error(self):
+        self.mock_api(httpx.Response(400, json={"status": 400, "error": "Bad Request"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("advanced_search_tickets", {"terms": {"subject": "VPN"}})
+
     async def test_get_ticket_details_requests_ticket_by_number(self):
         ticket = {"ticket_number": 1234, "subject": "Printer not working", "priority": 10}
         self.mock_api(httpx.Response(200, json=ticket))

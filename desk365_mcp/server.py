@@ -99,6 +99,153 @@ async def list_tickets(
 
 
 @mcp.tool
+async def search_tickets(
+    query: str,
+    search_in: list[
+        Literal[
+            'subject',
+            'description',
+            'conversations',
+            'attachment_names',
+            'custom_fields',
+            'contacts_and_companies',
+        ]
+    ] | None = None,
+    include_archived: bool = False,
+    ticket_count: Literal[30, 50, 100] = 30,
+    offset: int = 0,
+    include_description: bool = False,
+    include_custom_fields: bool = False,
+    include_survey_details: bool = False,
+    order_by: Literal['relevance', 'created_time', 'updated_time'] = 'relevance',
+    include_merged: bool = True,
+) -> dict[str, Any]:
+    """Full-text search for Desk365 tickets, sorted by relevance by default.
+
+    Use this to find tickets by what they are about, e.g. "printer offline" or a
+    contact's name. To find tickets by status, priority, assignee, group, category,
+    contact email or date instead, use list_tickets with filters, which is cheaper.
+    To require a match in specific fields at once (e.g. subject AND a custom field),
+    use advanced_search_tickets.
+
+    Each search costs 5 times as much of the Desk365 API rate limit as other calls
+    (which can be as low as 100 calls per hour), so search once with a good query
+    instead of many narrow ones.
+
+    Query syntax: by default a ticket matches if it contains all the words, in any
+    order, including word variations. For an exact phrase, include double quotes in
+    the query itself: the query "error 504" with its quotes matches only that phrase.
+    Put * before text to match words ending with it (*365 matches Desk365), or
+    before and after to match words containing it (*pass* matches password).
+
+    Returns {"count": <total matching tickets>, "tickets": [<ticket>, ...]} with the
+    same ticket fields as list_tickets. At most 1,000 matching tickets can be paged
+    through. To fetch the next page, call again with offset increased by
+    ticket_count; stop once offset reaches count or 1,000.
+
+    Coded values in results:
+    - priority: Low=1, Medium=5, High=10, Urgent=20
+    - source: Email=1, Microsoft Teams=5, Support Portal=6, Phone or Other=7,
+      Web Form=12, Web Widget=13, API=15, Chat Widget (AI Agent)=16,
+      Microsoft Teams (AI Agent)=17, Support Portal (AI Agent)=18
+
+    Args:
+        query: The text to search for.
+        search_in: Where to look. subject also matches ticket numbers; conversations
+            covers replies and notes; custom_fields covers text and paragraph custom
+            fields; contacts_and_companies covers contact and company names. Leave
+            unset to search all of them.
+        include_archived: Also search archived tickets.
+        ticket_count: Number of tickets per page. Only 30, 50 or 100 are allowed.
+        offset: Number of tickets to skip, for paging. Start at 0.
+        include_description: Include each ticket's description as HTML and plain text.
+        include_custom_fields: Include the account's custom ticket fields.
+        include_survey_details: Include the latest customer survey rating, when a
+            survey was sent for the ticket.
+        order_by: Sort by search relevance, creation time or last update time.
+        include_merged: Include tickets that were merged into other tickets.
+    """
+    logger.info('Searching Desk365 tickets (query=%r, offset=%s)', query, offset)
+    return await api.search_tickets(
+        env_config,
+        query,
+        search_in=search_in,
+        include_archived=include_archived,
+        ticket_count=ticket_count,
+        offset=offset,
+        include_description=include_description,
+        include_custom_fields=include_custom_fields,
+        include_survey_details=include_survey_details,
+        order_by=order_by,
+        include_merged=include_merged,
+    )
+
+
+@mcp.tool
+async def advanced_search_tickets(
+    terms: dict[str, str],
+    ticket_count: Literal[30, 50, 100] = 30,
+    offset: int = 0,
+    include_description: bool = False,
+    include_custom_fields: bool = False,
+    include_survey_details: bool = False,
+    order_by: Literal['relevance', 'created_time', 'updated_time'] = 'relevance',
+    include_merged: bool = True,
+) -> dict[str, Any]:
+    """Search Desk365 tickets by text in specific fields, where every field must match.
+
+    Use this when the user's request names particular fields, e.g. tickets whose
+    subject mentions "VPN" and whose "Site" custom field contains "Denver". For a
+    general text search, use search_tickets. For status, priority, assignee, group,
+    category, contact email or date, use list_tickets with filters.
+
+    Each search costs 5 times as much of the Desk365 API rate limit as other calls
+    (which can be as low as 100 calls per hour).
+
+    Query syntax for each term: a field matches if it contains all the words, in any
+    order, including word variations. Wrap words in double quotes for an exact match.
+    Put * before text to match words ending with it, or before and after to match
+    words containing it (*pass* matches password).
+
+    Returns {"count": <total matching tickets>, "tickets": [<ticket>, ...]} with the
+    same ticket fields and coded values as list_tickets (e.g. priority Low=1,
+    Medium=5, High=10, Urgent=20). At most 1,000 matching tickets can be paged
+    through. To fetch the next page, call again with offset increased by
+    ticket_count; stop once offset reaches count or 1,000.
+
+    Args:
+        terms: Maps each field to the text it must contain. A ticket is returned only
+            if every field matches. Fields can be "subject", "ticket_number" (one
+            number or several separated by commas, e.g. "130,131") or
+            "cf_<field name>" for a text or paragraph custom field, using the name as
+            it appears in get_ticket_details custom_fields. Example:
+            {"subject": "VPN", "cf_Site": "Denver"}.
+        ticket_count: Number of tickets per page. Only 30, 50 or 100 are allowed.
+        offset: Number of tickets to skip, for paging. Start at 0.
+        include_description: Include each ticket's description as HTML and plain text.
+        include_custom_fields: Include the account's custom ticket fields.
+        include_survey_details: Include the latest customer survey rating, when a
+            survey was sent for the ticket.
+        order_by: Sort by search relevance, creation time or last update time.
+        include_merged: Include tickets that were merged into other tickets.
+    """
+    logger.info(
+        'Advanced searching Desk365 tickets (fields=%s, offset=%s)', list(terms), offset
+    )
+    return await api.advanced_search_tickets(
+        env_config,
+        terms,
+        ticket_count=ticket_count,
+        offset=offset,
+        include_description=include_description,
+        include_custom_fields=include_custom_fields,
+        include_survey_details=include_survey_details,
+        order_by=order_by,
+        include_merged=include_merged,
+    )
+
+
+@mcp.tool
 async def get_ticket_details(ticket_number: int) -> dict[str, Any]:
     """Get the full details of one Desk365 ticket by its ticket number.
 

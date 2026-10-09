@@ -270,6 +270,192 @@ class GetTicketConversationsTests(ApiTestCase):
         self.assertEqual(error.exception.response.status_code, 404)
 
 
+SEARCH_DEFAULT_PARAMS = {
+    "ticket_count": "30",
+    "offset": "0",
+    "include_description": "0",
+    "include_custom_fields": "0",
+    "include_survey_details": "0",
+    "order_by": "relevance",
+    "include_merged": "1",
+}
+
+
+class SearchTicketsTests(ApiTestCase):
+    async def test_returns_parsed_json(self):
+        results = {"count": 1, "tickets": [{"ticket_number": 10, "subject": "Printer offline"}]}
+        self.mock_api(httpx.Response(200, json=results))
+
+        result = await api.search_tickets(ENV_CONFIG, "printer offline")
+
+        self.assertEqual(result, results)
+        self.assertEqual(self.request.method, "GET")
+        self.assertEqual(self.request.url.path, "/apis/v3/tickets/search")
+
+    async def test_searches_all_fields_except_archived_by_default(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "tickets": []}))
+
+        await api.search_tickets(ENV_CONFIG, "printer offline")
+
+        params = dict(self.request.url.params)
+        self.assertEqual(params.pop("search_type"), "1")
+        self.assertEqual(
+            json.loads(params.pop("search_query")),
+            {"query": "printer offline", "search_in": [1, 2, 3, 4, 5, 6]},
+        )
+        self.assertEqual(params, SEARCH_DEFAULT_PARAMS)
+
+    async def test_maps_search_in_names_to_codes(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "tickets": []}))
+
+        await api.search_tickets(
+            ENV_CONFIG,
+            "invoice",
+            search_in=["contacts_and_companies", "conversations", "subject", "subject"],
+        )
+
+        search_query = json.loads(self.request.url.params["search_query"])
+        self.assertEqual(search_query["search_in"], [1, 3, 6])
+
+    async def test_include_archived_adds_archived_code(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "tickets": []}))
+
+        await api.search_tickets(ENV_CONFIG, "invoice", search_in=["subject"], include_archived=True)
+
+        search_query = json.loads(self.request.url.params["search_query"])
+        self.assertEqual(search_query["search_in"], [1, 7])
+
+    async def test_converts_arguments_to_api_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "tickets": []}))
+
+        await api.search_tickets(
+            ENV_CONFIG,
+            '"error 504"',
+            ticket_count=100,
+            offset=200,
+            include_description=True,
+            include_custom_fields=True,
+            include_survey_details=True,
+            order_by="updated_time",
+            include_merged=False,
+        )
+
+        params = dict(self.request.url.params)
+        self.assertEqual(json.loads(params.pop("search_query"))["query"], '"error 504"')
+        self.assertEqual(
+            params,
+            {
+                "search_type": "1",
+                "ticket_count": "100",
+                "offset": "200",
+                "include_description": "1",
+                "include_custom_fields": "1",
+                "include_survey_details": "1",
+                "order_by": "updated_time",
+                "include_merged": "0",
+            },
+        )
+
+    async def test_rejects_empty_query(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "query must not be empty"):
+            await api.search_tickets(ENV_CONFIG, "  ")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_rejects_unknown_search_in_field(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "Unknown search_in fields: notes"):
+            await api.search_tickets(ENV_CONFIG, "invoice", search_in=["subject", "notes"])
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_on_http_error(self):
+        self.mock_api(httpx.Response(429, json={"status": 429, "error": "Too Many Requests"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api.search_tickets(ENV_CONFIG, "invoice")
+
+
+class AdvancedSearchTicketsTests(ApiTestCase):
+    async def test_returns_parsed_json(self):
+        results = {"count": 1, "tickets": [{"ticket_number": 130}]}
+        self.mock_api(httpx.Response(200, json=results))
+
+        result = await api.advanced_search_tickets(ENV_CONFIG, {"ticket_number": "130"})
+
+        self.assertEqual(result, results)
+        self.assertEqual(self.request.url.path, "/apis/v3/tickets/search")
+
+    async def test_builds_one_search_term_per_field(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "tickets": []}))
+
+        await api.advanced_search_tickets(
+            ENV_CONFIG,
+            {"subject": "VPN", "ticket_number": "130,131", "cf_Site": "Denver"},
+        )
+
+        params = dict(self.request.url.params)
+        self.assertEqual(params.pop("search_type"), "2")
+        self.assertEqual(
+            json.loads(params.pop("search_query")),
+            {
+                "search_term": [
+                    {"query": "VPN", "search_in": ["subject"]},
+                    {"query": "130,131", "search_in": ["ticket_number"]},
+                    {"query": "Denver", "search_in": ["cf_Site"]},
+                ]
+            },
+        )
+        self.assertEqual(params, SEARCH_DEFAULT_PARAMS)
+
+    async def test_converts_arguments_to_api_params(self):
+        self.mock_api(httpx.Response(200, json={"count": 0, "tickets": []}))
+
+        await api.advanced_search_tickets(
+            ENV_CONFIG,
+            {"subject": "VPN"},
+            ticket_count=50,
+            offset=50,
+            include_description=True,
+            order_by="created_time",
+            include_merged=False,
+        )
+
+        params = self.request.url.params
+        self.assertEqual(params["ticket_count"], "50")
+        self.assertEqual(params["offset"], "50")
+        self.assertEqual(params["include_description"], "1")
+        self.assertEqual(params["order_by"], "created_time")
+        self.assertEqual(params["include_merged"], "0")
+
+    async def test_rejects_empty_terms(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "at least one field"):
+            await api.advanced_search_tickets(ENV_CONFIG, {})
+
+        self.assertEqual(self.requests, [])
+
+    async def test_rejects_unsupported_fields(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "Unknown terms fields: description, status"):
+            await api.advanced_search_tickets(
+                ENV_CONFIG, {"subject": "VPN", "description": "x", "status": "Open"}
+            )
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_on_http_error(self):
+        self.mock_api(httpx.Response(400, json={"status": 400, "error": "Bad Request"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api.advanced_search_tickets(ENV_CONFIG, {"subject": "VPN"})
+
+
 class CreateTicketTests(ApiTestCase):
     async def test_returns_created_ticket(self):
         created = {"ticket_number": 101, "subject": "Help"}

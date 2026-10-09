@@ -10,6 +10,8 @@ It works with any Desk365 account. Everything specific to your account goes in a
 | --- | --- |
 | `ping` | Checks that the Desk365 API is up and reachable. It doesn't check your API key. |
 | `list_tickets` | Lists tickets. It supports paging (30, 50 or 100 per page), sorting by created or updated time, `updated_since`, and filters on status, priority, type, group, assignee, category, subcategory, source, contact, company and custom dropdown fields. |
+| `search_tickets` | Full-text search for tickets, sorted by relevance. It can search subjects and ticket numbers, descriptions, replies and notes, attachment names, custom fields, and contact and company names, and can include archived tickets. |
+| `advanced_search_tickets` | Searches specific fields (subject, ticket number, or text custom fields) and returns tickets where every field matches. |
 | `get_ticket_details` | Gets the full details of one ticket by ticket number, including its description and custom fields. |
 | `get_ticket_conversations` | Gets a ticket's conversation history: contact and agent replies, public and private notes, and forwarded messages. Each type can be left out, and messages can be sorted oldest or newest first. |
 | `create_ticket` | Creates a ticket for a contact's email address. It can set the description, status, priority, type, assignee, group, category, subcategory, form, custom fields, watchers and shared contacts. |
@@ -70,7 +72,7 @@ claude mcp add --transport http desk365 http://localhost:8000/
 
 ## Rate limits
 
-Desk365 limits API calls by plan: 100 calls per hour on Standard, and 50 calls per minute on Plus and Premium. Every tool call makes one API request. The `list_tickets` docstring tells the LLM to use filters instead of paging through every ticket.
+Desk365 limits API calls by plan: 100 calls per hour on Standard, and 50 calls per minute on Plus and Premium. Every tool call makes one API request, and Desk365 counts each search request as 5 calls. The `list_tickets` docstring tells the LLM to use filters instead of paging through every ticket.
 
 ## Development
 
