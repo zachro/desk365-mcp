@@ -1,6 +1,6 @@
 # desk365-mcp
 
-An [MCP](https://modelcontextprotocol.io) server for [Desk365](https://www.desk365.io), the help desk software. It lets an MCP client such as Claude, Claude Code or Cursor work with your Desk365 tickets through the [Desk365 API (v3)](https://help.desk365.io/en/articles/desk365-api/).
+An [MCP](https://modelcontextprotocol.io) server for [Desk365](https://www.desk365.io), the help desk software. It lets an MCP client such as Claude Code or open-source/self-hosted LLMs work with your Desk365 tickets through the [Desk365 API (v3)](https://help.desk365.io/en/articles/desk365-api/).
 
 It works with any Desk365 account. Everything specific to your account goes in an env file, so you don't need to change any code.
 
