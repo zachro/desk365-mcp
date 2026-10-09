@@ -18,21 +18,21 @@ class ConfigTests(unittest.TestCase):
         self.addCleanup(self.dotenv.stop)
 
     def test_reads_config_from_environment(self):
-        os.environ.update(API_KEY="test-api-key", UNRELATED="excluded")
+        os.environ.update(API_KEY="test-api-key", SUBDOMAIN="acme", UNRELATED="excluded")
 
         result = config.get_env_config()
 
-        self.assertEqual(result, {"API_KEY": "test-api-key"})
+        self.assertEqual(result, {"API_KEY": "test-api-key", "SUBDOMAIN": "acme"})
 
     def test_no_stage_loads_bare_env_file(self):
-        os.environ["API_KEY"] = "test-api-key"
+        os.environ.update(API_KEY="test-api-key", SUBDOMAIN="acme")
 
         config.get_env_config()
 
         self.load_dotenv.assert_called_once_with(config.PROJECT_ROOT / ".env")
 
     def test_stage_loads_stage_env_file(self):
-        os.environ["API_KEY"] = "test-api-key"
+        os.environ.update(API_KEY="test-api-key", SUBDOMAIN="acme")
         with tempfile.TemporaryDirectory() as tmp, patch.object(config, "PROJECT_ROOT", Path(tmp)):
             (Path(tmp) / "dev.env").touch()
 
@@ -52,23 +52,26 @@ class ConfigTests(unittest.TestCase):
             config.get_env_config()
 
         message = str(error.exception)
-        self.assertIn("Missing required environment variables: API_KEY.", message)
+        self.assertIn("Missing required environment variables: API_KEY, SUBDOMAIN.", message)
         self.assertIn(str(config.PROJECT_ROOT / ".env"), message)
         self.assertIn("or as explicit environment variables.", message)
 
     def test_empty_api_key_is_rejected(self):
-        os.environ["API_KEY"] = ""
+        os.environ.update(API_KEY="", SUBDOMAIN="acme")
 
         with self.assertRaisesRegex(ValueError, "Missing required environment variables: API_KEY"):
             config.get_env_config()
 
     def test_dotenv_is_loaded_before_validation(self):
         def populate_environment(_path):
-            os.environ["API_KEY"] = "dotenv-api-key"
+            os.environ.update(API_KEY="dotenv-api-key", SUBDOMAIN="acme")
 
         self.load_dotenv.side_effect = populate_environment
 
-        self.assertEqual(config.get_env_config(), {"API_KEY": "dotenv-api-key"})
+        self.assertEqual(
+            config.get_env_config(),
+            {"API_KEY": "dotenv-api-key", "SUBDOMAIN": "acme"},
+        )
 
     def test_reports_all_missing_required_variables(self):
         with patch.object(config, "REQUIRED_ENV_VARS", ["API_KEY", "SECOND_REQUIRED_VAR"]):
