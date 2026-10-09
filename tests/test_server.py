@@ -501,6 +501,67 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("add_ticket_reply", {"ticket_number": 99999, "body": "On it."})
 
+    async def test_add_ticket_note_posts_private_note_by_default(self):
+        note = {"id": 1, "ticket_number": 1234, "body": "Checked logs.", "private_note": 1}
+        self.mock_api(httpx.Response(200, json=note))
+
+        result = await self.call_tool(
+            "add_ticket_note", {"ticket_number": 1234, "body": "Checked logs."}
+        )
+
+        self.assertEqual(result.structured_content, note)
+        request = self.requests[0]
+        self.assertEqual(request.method, "POST")
+        self.assertEqual(request.url.path, "/apis/v3/tickets/add_note")
+        self.assertEqual(dict(request.url.params), {"ticket_number": "1234"})
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        self.assertEqual(
+            json.loads(request.content), {"body": "Checked logs.", "private_note": 1}
+        )
+
+    async def test_add_ticket_note_maps_options_to_api_fields(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+
+        await self.call_tool(
+            "add_ticket_note",
+            {
+                "ticket_number": 1234,
+                "body": "Fixed.",
+                "private": False,
+                "notify_emails": ["a@example.com"],
+                "agent_email": "agent@example.com",
+            },
+        )
+
+        self.assertEqual(
+            json.loads(self.requests[0].content),
+            {
+                "body": "Fixed.",
+                "private_note": 0,
+                "notify_emails": "a@example.com",
+                "agent_email": "agent@example.com",
+            },
+        )
+
+    async def test_add_ticket_note_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [
+            {"body": "Checked logs."},
+            {"ticket_number": 1234},
+            {"ticket_number": 1234, "body": "  "},
+        ]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("add_ticket_note", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_add_ticket_note_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("add_ticket_note", {"ticket_number": 99999, "body": "Checked."})
+
 
 if __name__ == "__main__":
     unittest.main()

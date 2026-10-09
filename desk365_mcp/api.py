@@ -289,3 +289,26 @@ async def add_ticket_reply(
         env_config, 'tickets/add_reply', payload, {'ticket_number': str(ticket_number)}
     )
     return response.json()
+
+
+async def add_ticket_note(
+    env_config: dict[str, str],
+    ticket_number: int,
+    body: str,
+    private: bool = True,
+    notify_emails: list[str] | None = None,
+    agent_email: str | None = None,
+) -> dict[str, Any]:
+    if not body.strip():
+        raise ValueError('body must not be empty.')
+    payload = {
+        'body': body,
+        'private_note': int(private),
+        'notify_emails': ','.join(notify_emails) if notify_emails else None,
+        'agent_email': agent_email,
+    }
+    payload = {key: value for key, value in payload.items() if value is not None}
+    response = await _post(
+        env_config, 'tickets/add_note', payload, {'ticket_number': str(ticket_number)}
+    )
+    return response.json()

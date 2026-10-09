@@ -632,5 +632,70 @@ class AddTicketReplyTests(ApiTestCase):
             await api.add_ticket_reply(ENV_CONFIG, 99999, "On it.")
 
 
+class AddTicketNoteTests(ApiTestCase):
+    async def test_returns_created_note(self):
+        note = {"id": 1, "ticket_number": 1234, "body": "Checked logs.", "private_note": 1}
+        self.mock_api(httpx.Response(200, json=note))
+
+        result = await api.add_ticket_note(ENV_CONFIG, 1234, "Checked logs.")
+
+        self.assertEqual(result, note)
+        self.assertEqual(self.request.method, "POST")
+        self.assertEqual(self.request.url.path, "/apis/v3/tickets/add_note")
+        self.assertEqual(dict(self.request.url.params), {"ticket_number": "1234"})
+
+    async def test_notes_are_private_by_default(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+
+        await api.add_ticket_note(ENV_CONFIG, 1234, "Checked logs.")
+
+        self.assertEqual(
+            json.loads(self.request.content), {"body": "Checked logs.", "private_note": 1}
+        )
+
+    async def test_maps_arguments_to_api_fields(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+
+        await api.add_ticket_note(
+            ENV_CONFIG,
+            1234,
+            "<p>Fixed.</p>",
+            private=False,
+            notify_emails=["a@example.com", "b@example.com"],
+            agent_email="agent@example.com",
+        )
+
+        self.assertEqual(
+            json.loads(self.request.content),
+            {
+                "body": "<p>Fixed.</p>",
+                "private_note": 0,
+                "notify_emails": "a@example.com,b@example.com",
+                "agent_email": "agent@example.com",
+            },
+        )
+
+    async def test_omits_empty_notify_emails(self):
+        self.mock_api(httpx.Response(200, json={"id": 1}))
+
+        await api.add_ticket_note(ENV_CONFIG, 1234, "Checked logs.", notify_emails=[])
+
+        self.assertNotIn("notify_emails", json.loads(self.request.content))
+
+    async def test_rejects_empty_body(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "body must not be empty"):
+            await api.add_ticket_note(ENV_CONFIG, 1234, "")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api.add_ticket_note(ENV_CONFIG, 99999, "Checked logs.")
+
+
 if __name__ == "__main__":
     unittest.main()

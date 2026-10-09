@@ -324,7 +324,7 @@ async def get_ticket_conversations(
         include_contact_replies: Include replies from the contact.
         include_agent_replies: Include replies from agents.
         include_private_notes: Include agents' internal notes.
-        include_public_notes: Include public notes.
+        include_public_notes: Include public notes, which are also sent to the contact.
         include_forward_messages: Include messages forwarded from the ticket.
     """
     logger.info('Getting Desk365 ticket conversations (ticket_number=%s)', ticket_number)
@@ -464,6 +464,54 @@ async def add_ticket_reply(
         from_email=from_email,
         include_prev_ccs=include_prev_ccs,
         include_prev_messages=include_prev_messages,
+    )
+
+
+@mcp.tool
+async def add_ticket_note(
+    ticket_number: int,
+    body: str,
+    private: bool = True,
+    notify_emails: list[str] | None = None,
+    agent_email: str | None = None,
+) -> dict[str, Any]:
+    """Add a note to a Desk365 ticket. Notes are private (seen only by agents) by default.
+
+    Use a private note to record internal information on a ticket, such as
+    troubleshooting steps, findings or a handoff summary for other agents. Only call
+    this when the user has asked to add a note. Each call adds another note, so don't
+    retry after a success.
+
+    Setting private to false makes a public note, which is emailed to the ticket's
+    contact like a reply and can't be taken back. Only make a public note when the
+    user explicitly asks for one, and get their approval of the exact text first. To
+    answer the contact, add_ticket_reply is usually what the user wants.
+
+    Returns the created note: {"id", "ticket_number", "body", "private_note"
+    (1 for private, 0 for public), "notify_emails", "to_email" (the contact it was
+    sent to; null for private notes), "attachments"}.
+
+    Args:
+        ticket_number: The ticket's number, as shown in Desk365 (e.g. 1234).
+        body: The note text. It can use HTML formatting such as <p>, <br> and <b>.
+        private: true for a private note only agents can see, false for a public note
+            that is sent to the contact.
+        notify_emails: Email addresses of agents to notify about the note.
+        agent_email: Email address of the agent the note is from. Leave unset unless
+            the user says which agent should add it.
+    """
+    logger.info(
+        'Adding %s note to Desk365 ticket (ticket_number=%s)',
+        'private' if private else 'public',
+        ticket_number,
+    )
+    return await api.add_ticket_note(
+        env_config,
+        ticket_number,
+        body,
+        private=private,
+        notify_emails=notify_emails,
+        agent_email=agent_email,
     )
 
 
