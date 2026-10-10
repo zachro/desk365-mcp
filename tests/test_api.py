@@ -1059,5 +1059,35 @@ class ListLocationsTests(ApiTestCase):
             await api.list_locations(ENV_CONFIG)
 
 
+class GetLocationDetailsTests(ApiTestCase):
+    async def test_requests_location_by_name(self):
+        location = {"location_name": "Main Office", "contact_name": "Jane Doe"}
+        self.mock_api(httpx.Response(200, json=location))
+
+        result = await api.get_location_details(ENV_CONFIG, "Main Office")
+
+        self.assertEqual(result, location)
+        self.assertEqual(self.request.method, "GET")
+        self.assertEqual(self.request.url.path, "/apis/v3/asset_mgmt/locations/details")
+        self.assertEqual(dict(self.request.url.params), {"location_name": "Main Office"})
+        self.assertEqual(self.request.headers["Authorization"], "test-api-key")
+
+    async def test_rejects_empty_location_name(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        with self.assertRaisesRegex(ValueError, "location_name must not be empty"):
+            await api.get_location_details(ENV_CONFIG, "")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_when_location_not_found(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(httpx.HTTPStatusError) as error:
+            await api.get_location_details(ENV_CONFIG, "Nowhere")
+
+        self.assertEqual(error.exception.response.status_code, 404)
+
+
 if __name__ == "__main__":
     unittest.main()

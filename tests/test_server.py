@@ -821,6 +821,33 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("list_locations")
 
+    async def test_get_location_details_requests_location_by_name(self):
+        location = {"location_name": "Main Office", "contact_name": "Jane Doe"}
+        self.mock_api(httpx.Response(200, json=location))
+
+        result = await self.call_tool("get_location_details", {"location_name": "Main Office"})
+
+        self.assertEqual(result.structured_content, location)
+        request = self.requests[0]
+        self.assertEqual(request.url.path, "/apis/v3/asset_mgmt/locations/details")
+        self.assertEqual(dict(request.url.params), {"location_name": "Main Office"})
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+
+    async def test_get_location_details_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [{}, {"location_name": " "}]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("get_location_details", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_get_location_details_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("get_location_details", {"location_name": "Nowhere"})
+
 
 if __name__ == "__main__":
     unittest.main()

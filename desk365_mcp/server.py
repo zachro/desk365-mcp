@@ -723,6 +723,25 @@ async def list_locations() -> dict[str, Any]:
     return await api.list_locations(env_config)
 
 
+@mcp.tool
+async def get_location_details(location_name: str) -> dict[str, Any]:
+    """Get one Desk365 asset management location by its name.
+
+    Use this to look up a location's contact person or address, e.g. to find who to
+    contact at the site a ticket is about. Get the exact name from list_locations if
+    you're unsure of it.
+
+    Returns the location: location_name, parent_location_name (empty for top-level
+    locations), contact_name, contact_email, contact_phone, location_address,
+    location_city, location_state, location_country and location_zipcode.
+
+    Args:
+        location_name: The location's exact name, as shown by list_locations.
+    """
+    logger.info('Getting Desk365 location details (location_name=%r)', location_name)
+    return await api.get_location_details(env_config, location_name)
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

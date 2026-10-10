@@ -23,6 +23,7 @@ It works with any Desk365 account. Everything specific to your account goes in a
 | `list_kb_articles` | Lists the titles of all live knowledge base articles. |
 | `get_kb_article` | Gets a live knowledge base article's full content and links by its title. |
 | `list_locations` | Lists all asset management locations (offices, sites, rooms) with their parent location, contact and address. |
+| `get_location_details` | Gets one location's parent location, contact and address by its name. |
 
 Each tool's docstring in `desk365_mcp/server.py` explains to the LLM when and how to use it.
 

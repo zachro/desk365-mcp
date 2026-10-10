@@ -442,3 +442,12 @@ async def get_kb_article(env_config: dict[str, str], title: str) -> dict[str, An
 async def list_locations(env_config: dict[str, str]) -> dict[str, Any]:
     response = await _get(env_config, 'asset_mgmt/locations')
     return response.json()
+
+
+async def get_location_details(env_config: dict[str, str], location_name: str) -> dict[str, Any]:
+    if not location_name.strip():
+        raise ValueError('location_name must not be empty.')
+    response = await _get(
+        env_config, 'asset_mgmt/locations/details', {'location_name': location_name}
+    )
+    return response.json()
