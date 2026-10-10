@@ -803,6 +803,24 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("get_kb_article", {"title": "No such article"})
 
+    async def test_list_locations_returns_locations(self):
+        locations = {"total": 1, "locations": [{"location_name": "Main Office"}]}
+        self.mock_api(httpx.Response(200, json=locations))
+
+        result = await self.call_tool("list_locations")
+
+        self.assertEqual(result.structured_content, locations)
+        request = self.requests[0]
+        self.assertEqual(request.method, "GET")
+        self.assertEqual(request.url.path, "/apis/v3/asset_mgmt/locations")
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+
+    async def test_list_locations_raises_on_http_error(self):
+        self.mock_api(httpx.Response(403, json={"status": 403, "error": "Forbidden"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("list_locations")
+
 
 if __name__ == "__main__":
     unittest.main()

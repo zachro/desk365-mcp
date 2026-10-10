@@ -437,3 +437,8 @@ async def get_kb_article(env_config: dict[str, str], title: str) -> dict[str, An
         raise ValueError('title must not be empty.')
     response = await _get(env_config, 'kb/article/details', {'article_name': title})
     return response.json()
+
+
+async def list_locations(env_config: dict[str, str]) -> dict[str, Any]:
+    response = await _get(env_config, 'asset_mgmt/locations')
+    return response.json()

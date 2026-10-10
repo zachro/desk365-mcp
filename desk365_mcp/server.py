@@ -703,6 +703,26 @@ async def get_kb_article(title: str) -> dict[str, Any]:
     return await api.get_kb_article(env_config, title)
 
 
+@mcp.tool
+async def list_locations() -> dict[str, Any]:
+    """List all asset management locations in Desk365, such as offices, sites or rooms.
+
+    Locations record where an organization's assets are and who to contact there.
+    They can be nested: a location may sit under a parent location (e.g. "Floor 2"
+    under "New York Office"). Use this to find a location's exact name before
+    get_location_details or update_location, or to check that a name isn't already
+    taken before create_location.
+
+    Returns {"total": <number of locations>, "locations": [<location>, ...]} with
+    every location at once. Each location has location_name, parent_location_name
+    (empty for top-level locations), contact_name, contact_email, contact_phone,
+    location_address, location_city, location_state, location_country and
+    location_zipcode.
+    """
+    logger.info('Listing Desk365 locations')
+    return await api.list_locations(env_config)
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

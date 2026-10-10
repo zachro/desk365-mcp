@@ -1032,5 +1032,32 @@ class GetKbArticleTests(ApiTestCase):
         self.assertEqual(error.exception.response.status_code, 404)
 
 
+class ListLocationsTests(ApiTestCase):
+    async def test_returns_locations(self):
+        locations = {
+            "total": 2,
+            "locations": [
+                {"location_name": "Main Office", "parent_location_name": ""},
+                {"location_name": "Floor 2", "parent_location_name": "Main Office"},
+            ],
+        }
+        self.mock_api(httpx.Response(200, json=locations))
+
+        result = await api.list_locations(ENV_CONFIG)
+
+        self.assertEqual(result, locations)
+        self.assertEqual(self.request.method, "GET")
+        self.assertEqual(
+            str(self.request.url), "https://acme.desk365.io/apis/v3/asset_mgmt/locations"
+        )
+        self.assertEqual(self.request.headers["Authorization"], "test-api-key")
+
+    async def test_raises_on_http_error(self):
+        self.mock_api(httpx.Response(403, json={"status": 403, "error": "Forbidden"}))
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            await api.list_locations(ENV_CONFIG)
+
+
 if __name__ == "__main__":
     unittest.main()
