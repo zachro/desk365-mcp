@@ -15,6 +15,19 @@ SEARCH_FIELDS = {
 }
 SEARCH_ARCHIVED_TICKETS = 7
 ADVANCED_SEARCH_FIELDS = ('subject', 'ticket_number')
+# Maximum lengths Desk365 accepts for location fields.
+LOCATION_FIELD_LIMITS = {
+    'location_name': 128,
+    'parent_location_name': 128,
+    'contact_name': 128,
+    'contact_email': 128,
+    'contact_phone': 64,
+    'location_address': 250,
+    'location_city': 100,
+    'location_state': 100,
+    'location_country': 100,
+    'location_zipcode': 64,
+}
 # Codes for the fields contacts can be sorted by.
 CONTACT_SORT_FIELDS = {
     'name': 1,
@@ -450,4 +463,47 @@ async def get_location_details(env_config: dict[str, str], location_name: str) -
     response = await _get(
         env_config, 'asset_mgmt/locations/details', {'location_name': location_name}
     )
+    return response.json()
+
+
+def _check_location_fields(fields: dict[str, str | None]) -> None:
+    too_long = [
+        f'{name} (max {LOCATION_FIELD_LIMITS[name]} characters)'
+        for name, value in fields.items()
+        if value is not None and len(value) > LOCATION_FIELD_LIMITS[name]
+    ]
+    if too_long:
+        raise ValueError(f'Too long: {", ".join(too_long)}.')
+
+
+async def create_location(
+    env_config: dict[str, str],
+    location_name: str,
+    parent_location_name: str | None = None,
+    contact_name: str | None = None,
+    contact_email: str | None = None,
+    contact_phone: str | None = None,
+    location_address: str | None = None,
+    location_city: str | None = None,
+    location_state: str | None = None,
+    location_country: str | None = None,
+    location_zipcode: str | None = None,
+) -> dict[str, Any]:
+    if not location_name.strip():
+        raise ValueError('location_name must not be empty.')
+    body = {
+        'location_name': location_name,
+        'parent_location_name': parent_location_name or None,
+        'contact_name': contact_name,
+        'contact_email': contact_email,
+        'contact_phone': contact_phone,
+        'location_address': location_address,
+        'location_city': location_city,
+        'location_state': location_state,
+        'location_country': location_country,
+        'location_zipcode': location_zipcode,
+    }
+    body = {key: value for key, value in body.items() if value is not None}
+    _check_location_fields(body)
+    response = await _post(env_config, 'asset_mgmt/locations/create', body)
     return response.json()

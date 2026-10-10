@@ -1089,5 +1089,100 @@ class GetLocationDetailsTests(ApiTestCase):
         self.assertEqual(error.exception.response.status_code, 404)
 
 
+class CreateLocationTests(ApiTestCase):
+    async def test_returns_created_location(self):
+        location = {"location_name": "Main Office", "parent_location_name": ""}
+        self.mock_api(httpx.Response(201, json=location))
+
+        result = await api.create_location(ENV_CONFIG, "Main Office")
+
+        self.assertEqual(result, location)
+        self.assertEqual(self.request.method, "POST")
+        self.assertEqual(self.request.url.path, "/apis/v3/asset_mgmt/locations/create")
+        self.assertEqual(self.request.headers["Authorization"], "test-api-key")
+
+    async def test_sends_only_name_by_default(self):
+        self.mock_api(httpx.Response(201, json={}))
+
+        await api.create_location(ENV_CONFIG, "Main Office")
+
+        self.assertEqual(json.loads(self.request.content), {"location_name": "Main Office"})
+
+    async def test_sends_all_given_fields(self):
+        self.mock_api(httpx.Response(201, json={}))
+
+        await api.create_location(
+            ENV_CONFIG,
+            "Floor 2",
+            parent_location_name="Main Office",
+            contact_name="Jane Doe",
+            contact_email="jane@example.com",
+            contact_phone="+1-555-0100",
+            location_address="1 Example St",
+            location_city="Springfield",
+            location_state="IL",
+            location_country="USA",
+            location_zipcode="62701",
+        )
+
+        self.assertEqual(
+            json.loads(self.request.content),
+            {
+                "location_name": "Floor 2",
+                "parent_location_name": "Main Office",
+                "contact_name": "Jane Doe",
+                "contact_email": "jane@example.com",
+                "contact_phone": "+1-555-0100",
+                "location_address": "1 Example St",
+                "location_city": "Springfield",
+                "location_state": "IL",
+                "location_country": "USA",
+                "location_zipcode": "62701",
+            },
+        )
+
+    async def test_omits_empty_parent_location(self):
+        self.mock_api(httpx.Response(201, json={}))
+
+        await api.create_location(ENV_CONFIG, "Main Office", parent_location_name="")
+
+        self.assertNotIn("parent_location_name", json.loads(self.request.content))
+
+    async def test_accepts_values_at_max_length(self):
+        self.mock_api(httpx.Response(201, json={}))
+
+        await api.create_location(ENV_CONFIG, "x" * 128, location_address="y" * 250)
+
+        self.assertEqual(len(self.requests), 1)
+
+    async def test_rejects_values_over_max_length(self):
+        self.mock_api(httpx.Response(201, json={}))
+
+        with self.assertRaisesRegex(
+            ValueError,
+            r"Too long: location_name \(max 128 characters\), "
+            r"contact_phone \(max 64 characters\)",
+        ):
+            await api.create_location(ENV_CONFIG, "x" * 129, contact_phone="1" * 65)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_rejects_empty_location_name(self):
+        self.mock_api(httpx.Response(201, json={}))
+
+        with self.assertRaisesRegex(ValueError, "location_name must not be empty"):
+            await api.create_location(ENV_CONFIG, " ")
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_when_name_already_exists(self):
+        self.mock_api(httpx.Response(409, json={"status": 409, "error": "Conflict"}))
+
+        with self.assertRaises(httpx.HTTPStatusError) as error:
+            await api.create_location(ENV_CONFIG, "Main Office")
+
+        self.assertEqual(error.exception.response.status_code, 409)
+
+
 if __name__ == "__main__":
     unittest.main()

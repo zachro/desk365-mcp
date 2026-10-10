@@ -742,6 +742,65 @@ async def get_location_details(location_name: str) -> dict[str, Any]:
     return await api.get_location_details(env_config, location_name)
 
 
+@mcp.tool
+async def create_location(
+    location_name: str,
+    parent_location_name: str | None = None,
+    contact_name: str | None = None,
+    contact_email: str | None = None,
+    contact_phone: str | None = None,
+    location_address: str | None = None,
+    location_city: str | None = None,
+    location_state: str | None = None,
+    location_country: str | None = None,
+    location_zipcode: str | None = None,
+) -> dict[str, Any]:
+    """Create a new Desk365 asset management location, such as an office, site or room.
+
+    Only call this when the user has asked for a new location. Each call creates
+    another location, so don't retry after a success. Location names must be unique;
+    check list_locations first if the location might already exist.
+
+    A location's parent can't be changed after it's created, so confirm
+    parent_location_name with the user if it's unclear. Leave it unset for a
+    top-level location.
+
+    If the call fails, a 409 error means a location with that name already exists,
+    a 404 error means the parent location wasn't found, and a 400 error means a
+    value was invalid.
+
+    Returns the created location with the same fields as get_location_details.
+
+    Args:
+        location_name: Name of the new location (max 128 characters).
+        parent_location_name: Exact name of an existing location to create this one
+            under (max 128 characters). It can't be changed later.
+        contact_name: Name of the contact person at this location (max 128
+            characters).
+        contact_email: Email of the contact person (max 128 characters).
+        contact_phone: Phone number of the contact person (max 64 characters).
+        location_address: Street address (max 250 characters).
+        location_city: City (max 100 characters).
+        location_state: State or region (max 100 characters).
+        location_country: Country (max 100 characters).
+        location_zipcode: Zip or postal code (max 64 characters).
+    """
+    logger.info('Creating Desk365 location (location_name=%r)', location_name)
+    return await api.create_location(
+        env_config,
+        location_name,
+        parent_location_name=parent_location_name,
+        contact_name=contact_name,
+        contact_email=contact_email,
+        contact_phone=contact_phone,
+        location_address=location_address,
+        location_city=location_city,
+        location_state=location_state,
+        location_country=location_country,
+        location_zipcode=location_zipcode,
+    )
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

@@ -848,6 +848,58 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("get_location_details", {"location_name": "Nowhere"})
 
+    async def test_create_location_posts_location(self):
+        location = {"location_name": "Main Office", "parent_location_name": ""}
+        self.mock_api(httpx.Response(201, json=location))
+
+        result = await self.call_tool("create_location", {"location_name": "Main Office"})
+
+        self.assertEqual(result.structured_content, location)
+        request = self.requests[0]
+        self.assertEqual(request.method, "POST")
+        self.assertEqual(request.url.path, "/apis/v3/asset_mgmt/locations/create")
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        self.assertEqual(json.loads(request.content), {"location_name": "Main Office"})
+
+    async def test_create_location_sends_all_given_fields(self):
+        self.mock_api(httpx.Response(201, json={}))
+        location = {
+            "location_name": "Floor 2",
+            "parent_location_name": "Main Office",
+            "contact_name": "Jane Doe",
+            "contact_email": "jane@example.com",
+            "contact_phone": "+1-555-0100",
+            "location_address": "1 Example St",
+            "location_city": "Springfield",
+            "location_state": "IL",
+            "location_country": "USA",
+            "location_zipcode": "62701",
+        }
+
+        await self.call_tool("create_location", location)
+
+        self.assertEqual(json.loads(self.requests[0].content), location)
+
+    async def test_create_location_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(201, json={}))
+
+        for arguments in [
+            {},
+            {"location_name": ""},
+            {"location_name": "x" * 129},
+            {"location_name": "Main Office", "location_zipcode": "1" * 65},
+        ]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("create_location", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_create_location_raises_on_http_error(self):
+        self.mock_api(httpx.Response(409, json={"status": 409, "error": "Conflict"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool("create_location", {"location_name": "Main Office"})
+
 
 if __name__ == "__main__":
     unittest.main()
