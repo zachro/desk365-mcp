@@ -801,6 +801,63 @@ async def create_location(
     )
 
 
+@mcp.tool
+async def update_location(
+    location_name: str,
+    new_location_name: str | None = None,
+    contact_name: str | None = None,
+    contact_email: str | None = None,
+    contact_phone: str | None = None,
+    location_address: str | None = None,
+    location_city: str | None = None,
+    location_state: str | None = None,
+    location_country: str | None = None,
+    location_zipcode: str | None = None,
+) -> dict[str, Any]:
+    """Change the name, contact or address of an existing Desk365 asset management
+    location.
+
+    Only call this when the user has asked for the change. Set only the fields that
+    should change; every field left unset keeps its current value. At least one
+    field must be set. A location's parent location can't be changed.
+
+    If the call fails, a 404 error means no location has that name, a 409 error
+    means new_location_name is already used by another location, and a 400 error
+    means a value was invalid.
+
+    Returns the updated location with the same fields as get_location_details.
+
+    Args:
+        location_name: The location's current exact name, as shown by
+            list_locations.
+        new_location_name: New name for the location (max 128 characters). It must
+            not already be used by another location.
+        contact_name: Name of the contact person at this location (max 128
+            characters).
+        contact_email: Email of the contact person (max 128 characters).
+        contact_phone: Phone number of the contact person (max 64 characters).
+        location_address: Street address (max 250 characters).
+        location_city: City (max 100 characters).
+        location_state: State or region (max 100 characters).
+        location_country: Country (max 100 characters).
+        location_zipcode: Zip or postal code (max 64 characters).
+    """
+    logger.info('Updating Desk365 location (location_name=%r)', location_name)
+    return await api.update_location(
+        env_config,
+        location_name,
+        new_location_name=new_location_name,
+        contact_name=contact_name,
+        contact_email=contact_email,
+        contact_phone=contact_phone,
+        location_address=location_address,
+        location_city=location_city,
+        location_state=location_state,
+        location_country=location_country,
+        location_zipcode=location_zipcode,
+    )
+
+
 def run_server(config: dict[str, str]):
     env_config.update(config)
     mcp.run(transport='streamable-http', port=8000, path='/')

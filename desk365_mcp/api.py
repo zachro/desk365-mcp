@@ -507,3 +507,42 @@ async def create_location(
     _check_location_fields(body)
     response = await _post(env_config, 'asset_mgmt/locations/create', body)
     return response.json()
+
+
+async def update_location(
+    env_config: dict[str, str],
+    location_name: str,
+    new_location_name: str | None = None,
+    contact_name: str | None = None,
+    contact_email: str | None = None,
+    contact_phone: str | None = None,
+    location_address: str | None = None,
+    location_city: str | None = None,
+    location_state: str | None = None,
+    location_country: str | None = None,
+    location_zipcode: str | None = None,
+) -> dict[str, Any]:
+    if not location_name.strip():
+        raise ValueError('location_name must not be empty.')
+    if new_location_name is not None and not new_location_name.strip():
+        raise ValueError('new_location_name must not be empty.')
+    body = {
+        'location_name': new_location_name,
+        'contact_name': contact_name,
+        'contact_email': contact_email,
+        'contact_phone': contact_phone,
+        'location_address': location_address,
+        'location_city': location_city,
+        'location_state': location_state,
+        'location_country': location_country,
+        'location_zipcode': location_zipcode,
+    }
+    # Desk365 only changes the fields present in the body.
+    body = {key: value for key, value in body.items() if value is not None}
+    if not body:
+        raise ValueError('Nothing to update: set at least one field to change.')
+    _check_location_fields(body)
+    response = await _put(
+        env_config, 'asset_mgmt/locations/update', body, {'location_name': location_name}
+    )
+    return response.json()

@@ -25,6 +25,7 @@ It works with any Desk365 account. Everything specific to your account goes in a
 | `list_locations` | Lists all asset management locations (offices, sites, rooms) with their parent location, contact and address. |
 | `get_location_details` | Gets one location's parent location, contact and address by its name. |
 | `create_location` | Creates a location, optionally under a parent location, with a contact and address. |
+| `update_location` | Renames a location or changes its contact or address. Fields that aren't set keep their current values. |
 
 Each tool's docstring in `desk365_mcp/server.py` explains to the LLM when and how to use it.
 

@@ -900,6 +900,52 @@ class ToolTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ToolError):
             await self.call_tool("create_location", {"location_name": "Main Office"})
 
+    async def test_update_location_puts_given_fields(self):
+        location = {"location_name": "Head Office", "location_city": "Springfield"}
+        self.mock_api(httpx.Response(200, json=location))
+
+        result = await self.call_tool(
+            "update_location",
+            {
+                "location_name": "Main Office",
+                "new_location_name": "Head Office",
+                "location_city": "Springfield",
+            },
+        )
+
+        self.assertEqual(result.structured_content, location)
+        request = self.requests[0]
+        self.assertEqual(request.method, "PUT")
+        self.assertEqual(request.url.path, "/apis/v3/asset_mgmt/locations/update")
+        self.assertEqual(dict(request.url.params), {"location_name": "Main Office"})
+        self.assertEqual(request.headers["Authorization"], "test-api-key")
+        self.assertEqual(
+            json.loads(request.content),
+            {"location_name": "Head Office", "location_city": "Springfield"},
+        )
+
+    async def test_update_location_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for arguments in [
+            {"contact_name": "Jane Doe"},
+            {"location_name": "Main Office"},
+            {"location_name": "Main Office", "parent_location_name": "Elsewhere"},
+            {"location_name": "Main Office", "contact_phone": "1" * 65},
+        ]:
+            with self.subTest(arguments=arguments), self.assertRaises(ToolError):
+                await self.call_tool("update_location", arguments)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_update_location_raises_on_http_error(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(ToolError):
+            await self.call_tool(
+                "update_location", {"location_name": "Nowhere", "contact_name": "Jane Doe"}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

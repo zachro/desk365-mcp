@@ -1184,5 +1184,88 @@ class CreateLocationTests(ApiTestCase):
         self.assertEqual(error.exception.response.status_code, 409)
 
 
+class UpdateLocationTests(ApiTestCase):
+    async def test_returns_updated_location(self):
+        location = {"location_name": "Main Office", "contact_name": "Jane Doe"}
+        self.mock_api(httpx.Response(200, json=location))
+
+        result = await api.update_location(ENV_CONFIG, "Main Office", contact_name="Jane Doe")
+
+        self.assertEqual(result, location)
+        self.assertEqual(self.request.method, "PUT")
+        self.assertEqual(self.request.url.path, "/apis/v3/asset_mgmt/locations/update")
+        self.assertEqual(dict(self.request.url.params), {"location_name": "Main Office"})
+        self.assertEqual(self.request.headers["Authorization"], "test-api-key")
+
+    async def test_sends_only_given_fields(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        await api.update_location(ENV_CONFIG, "Main Office", location_city="Springfield")
+
+        self.assertEqual(json.loads(self.request.content), {"location_city": "Springfield"})
+
+    async def test_sends_new_name_as_location_name(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        await api.update_location(ENV_CONFIG, "Main Office", new_location_name="Head Office")
+
+        self.assertEqual(dict(self.request.url.params), {"location_name": "Main Office"})
+        self.assertEqual(json.loads(self.request.content), {"location_name": "Head Office"})
+
+    async def test_sends_all_given_fields(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        await api.update_location(
+            ENV_CONFIG,
+            "Main Office",
+            new_location_name="Head Office",
+            contact_name="Jane Doe",
+            contact_email="jane@example.com",
+            contact_phone="+1-555-0100",
+            location_address="1 Example St",
+            location_city="Springfield",
+            location_state="IL",
+            location_country="USA",
+            location_zipcode="62701",
+        )
+
+        self.assertEqual(
+            json.loads(self.request.content),
+            {
+                "location_name": "Head Office",
+                "contact_name": "Jane Doe",
+                "contact_email": "jane@example.com",
+                "contact_phone": "+1-555-0100",
+                "location_address": "1 Example St",
+                "location_city": "Springfield",
+                "location_state": "IL",
+                "location_country": "USA",
+                "location_zipcode": "62701",
+            },
+        )
+
+    async def test_rejects_invalid_input(self):
+        self.mock_api(httpx.Response(200, json={}))
+
+        for location_name, kwargs, message in [
+            ("", {"contact_name": "Jane Doe"}, "location_name must not be empty"),
+            ("Main Office", {"new_location_name": " "}, "new_location_name must not be empty"),
+            ("Main Office", {}, "Nothing to update"),
+            ("Main Office", {"location_address": "x" * 251}, "location_address \\(max 250"),
+        ]:
+            with self.subTest(kwargs=kwargs), self.assertRaisesRegex(ValueError, message):
+                await api.update_location(ENV_CONFIG, location_name, **kwargs)
+
+        self.assertEqual(self.requests, [])
+
+    async def test_raises_when_location_not_found(self):
+        self.mock_api(httpx.Response(404, json={"status": 404, "error": "Not Found"}))
+
+        with self.assertRaises(httpx.HTTPStatusError) as error:
+            await api.update_location(ENV_CONFIG, "Nowhere", contact_name="Jane Doe")
+
+        self.assertEqual(error.exception.response.status_code, 404)
+
+
 if __name__ == "__main__":
     unittest.main()
